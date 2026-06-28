@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from lib.budget.estimate import OrcamentoResult
 from lib.concrete.beams import BeamFlexureResult
 from lib.concrete.columns import ColumnResult
 from lib.concrete.footings import FootingResult
@@ -646,5 +647,41 @@ def render_head_loss_memorial(r: HeadLossResult, rep: ValidationReport) -> str:
     add("")
 
     linhas += _validation_section(rep, 4)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+# ====================================================================== ORÇAMENTO
+
+
+def render_orcamento_memorial(r: OrcamentoResult, rep: ValidationReport) -> str:
+    """Memorial de orçamento (custo direto + BDI), preços tipo SINAPI (amostra)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Orçamento — Custo Direto + BDI")
+    add("")
+    add(f"**Referência:** {r.norma}  ")
+    add("**Base de preços:** tabela tipo SINAPI (amostra ILUSTRATIVA — substituir pela "
+        "SINAPI vigente/regional, com desoneração, mês de referência e UF do projeto)")
+    add("")
+
+    add("## 1. Itens orçados")
+    add("")
+    add("| Código | Descrição | Unid. | Qtd. | Preço unit. (R$) | Custo (R$) |")
+    add("|--------|-----------|-------|------|------------------|------------|")
+    for it in r.itens:
+        add(f"| {it.codigo} | {it.descricao} | {it.unidade} | "
+            f"{it.quantidade:.2f} | {it.preco_unitario:.2f} | {it.custo:.2f} |")
+    add("")
+
+    add("## 2. Composição do custo")
+    add("")
+    add(f"- Subtotal (custo direto): R$ {r.subtotal:.2f}")
+    add(f"- BDI aplicado: {r.bdi_pct:.2f}% → R$ {r.valor_bdi:.2f}")
+    add(f"- **Total (custo direto + BDI): R$ {r.total:.2f}**")
+    add("")
+
+    linhas += _validation_section(rep, 3)
     linhas += _disclaimer_footer()
     return "\n".join(linhas)

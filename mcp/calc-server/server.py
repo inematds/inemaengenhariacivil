@@ -20,7 +20,16 @@ from mcp.server.fastmcp import FastMCP
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT))
 
+from lib.budget.sinapi import load_sinapi, lookup  # noqa: E402
+from lib.projects.store import (  # noqa: E402
+    ProjectRecord,
+    add_calculo,
+    list_projects,
+    load_project,
+    save_project,
+)
 from lib.reporting.disclaimer import DISCLAIMER  # noqa: E402
+from lib.reporting.report import build_project_report  # noqa: E402
 from lib.service import (  # noqa: E402
     solve_bearing_capacity,
     solve_consolidation_settlement,
@@ -30,6 +39,7 @@ from lib.service import (  # noqa: E402
     solve_head_loss,
     solve_one_way_slab,
     solve_open_channel,
+    solve_orcamento,
     solve_pile_comparison,
     solve_pipe_flow,
     solve_rectangular_beam,
@@ -385,6 +395,112 @@ def perda_de_carga(
     )
 
 
+# ============================================================== ORÇAMENTO
+
+
+@mcp.tool()
+def montar_orcamento(
+    itens: list[dict],
+    bdi_pct: float = 0.0,
+    csv_path: str = "data/sinapi_amostra.csv",
+) -> dict:
+    """Monta um orçamento (custo direto + BDI) a partir de quantitativos.
+
+    ``itens`` é a lista ``[{"codigo": str, "quantidade": float}, ...]``; os preços vêm
+    da base tipo SINAPI em ``csv_path``. ATENÇÃO: a base de amostra é ILUSTRATIVA —
+    substitua pela SINAPI vigente/regional (desoneração, mês de referência e UF). BDI ∈
+    [0, 40] %. Código inexistente => erro (o agente deve abster-se). Devolve itens,
+    subtotal, BDI, total, validação aritmética, memorial e o aviso obrigatório.
+    """
+    return solve_orcamento(itens=itens, bdi_pct=bdi_pct, csv_path=csv_path)
+
+
+@mcp.tool()
+def consultar_preco_sinapi(
+    codigo: str,
+    csv_path: str = "data/sinapi_amostra.csv",
+) -> dict:
+    """Consulta o preço unitário de um código na base tipo SINAPI (amostra ilustrativa).
+
+    Código fora da base => erro (o agente deve abster-se em vez de inventar preço).
+    Devolve o item (código, descrição, unidade, preço unitário) e o aviso obrigatório.
+    """
+    item = lookup(codigo, load_sinapi(csv_path))
+    return {"resultado": item.model_dump(), "aviso": DISCLAIMER}
+
+
+# ============================================================== PROJETOS / DOCUMENTAÇÃO
+
+
+@mcp.tool()
+def salvar_projeto(
+    project_id: str,
+    nome: str,
+    responsavel: str | None = None,
+    criado_em: str | None = None,
+    metadados: dict | None = None,
+    base_dir: str = "memory/projects",
+) -> dict:
+    """Cria/sobrescreve o registro de um projeto na memória persistente (JSON por projeto).
+
+    ``project_id`` deve ser um nome de arquivo seguro (letras, dígitos, '_', '-', '.');
+    id inseguro => erro. Devolve o registro salvo, o caminho do arquivo e o aviso.
+    """
+    record = ProjectRecord(
+        project_id=project_id,
+        nome=nome,
+        responsavel=responsavel,
+        criado_em=criado_em,
+        metadados=metadados or {},
+    )
+    caminho = save_project(record, base_dir=base_dir)
+    return {"resultado": record.model_dump(), "caminho": caminho, "aviso": DISCLAIMER}
+
+
+@mcp.tool()
+def carregar_projeto(project_id: str, base_dir: str = "memory/projects") -> dict:
+    """Carrega o registro completo de um projeto (com o histórico de cálculos).
+
+    Projeto inexistente ou id inseguro => erro (o agente deve abster-se). Devolve o
+    registro e o aviso obrigatório.
+    """
+    record = load_project(project_id, base_dir=base_dir)
+    return {"resultado": record.model_dump(), "aviso": DISCLAIMER}
+
+
+@mcp.tool()
+def listar_projetos(base_dir: str = "memory/projects") -> dict:
+    """Lista os ``project_id`` existentes na memória persistente (ordenados)."""
+    return {"projetos": list_projects(base_dir=base_dir)}
+
+
+@mcp.tool()
+def registrar_calculo_no_projeto(
+    project_id: str,
+    bundle: dict,
+    base_dir: str = "memory/projects",
+    timestamp: str | None = None,
+) -> dict:
+    """Anexa um cálculo (bundle do service) ao histórico de um projeto e regrava o arquivo.
+
+    Idempotente para bundles idênticos. ``timestamp`` (ISO, fornecido pelo chamador) é
+    registrado em ``registrado_em``. Devolve o registro atualizado e o aviso.
+    """
+    record = add_calculo(project_id, bundle, base_dir=base_dir, timestamp=timestamp)
+    return {"resultado": record.model_dump(), "aviso": DISCLAIMER}
+
+
+@mcp.tool()
+def gerar_relatorio_projeto(project_id: str, base_dir: str = "memory/projects") -> dict:
+    """Gera o relatório técnico consolidado (Markdown) com todos os cálculos do projeto.
+
+    Costura os memoriais do histórico sob um cabeçalho do projeto e o índice de cálculos,
+    terminando com o aviso de responsabilidade técnica. Devolve o Markdown e o aviso.
+    """
+    record = load_project(project_id, base_dir=base_dir)
+    return {"relatorio_markdown": build_project_report(record), "aviso": DISCLAIMER}
+
+
 @mcp.tool()
 def listar_capacidades() -> dict:
     """Lista os cálculos disponíveis. Se o pedido não estiver aqui, o agente deve abster-se."""
@@ -404,14 +520,24 @@ def listar_capacidades() -> dict:
             "escoamento_conduto — conduto forçado, Hazen-Williams ou Darcy-Weisbach",
             "canal_aberto_manning — escoamento uniforme em canal aberto (Manning)",
             "perda_de_carga — perda distribuída + localizadas (coeficientes K)",
+            "montar_orcamento — orçamento custo direto + BDI, base tipo SINAPI (amostra)",
+            "consultar_preco_sinapi — preço unitário de um código na base SINAPI (amostra)",
             "combinar_acoes_elu — combinação última normal de ações (NBR 8681/6118)",
             "consultar_peso_material — peso específico de material (NBR 6120:2019 Tab.2)",
             "consultar_carga_uso — carga acidental por uso do ambiente (NBR 6120:2019)",
             "verificar_unidades — conversão/validação dimensional (pint)",
         ],
+        "memoria_e_documentacao": [
+            "salvar_projeto — cria/atualiza o registro de um projeto (memória persistente)",
+            "carregar_projeto — carrega um projeto e seu histórico de cálculos",
+            "listar_projetos — lista os projetos existentes na memória",
+            "registrar_calculo_no_projeto — anexa um bundle de cálculo ao histórico",
+            "gerar_relatorio_projeto — relatório técnico consolidado (Markdown) do projeto",
+        ],
         "nota": (
             "Resultados numéricos só vêm destas ferramentas. Para cálculos não listados, "
-            "informe que não há ferramenta disponível — não invente valores."
+            "informe que não há ferramenta disponível — não invente valores. Os preços "
+            "SINAPI são de AMOSTRA e devem ser atualizados pela tabela vigente/regional."
         ),
     }
 
@@ -437,7 +563,17 @@ def _selftest() -> int:
     conduto = solve_pipe_flow(
         Q_m3s=0.05, D_m=0.30, L_m=1000.0, metodo="hazen-williams", C=130.0,
     )
-    bundles = [viga, pilar, sapata, fundacao, conduto]
+    # orçamento: alguns itens da base de amostra com BDI 25%
+    orcamento = solve_orcamento(
+        itens=[
+            {"codigo": "92873", "quantidade": 1.5},
+            {"codigo": "92915", "quantidade": 180.0},
+            {"codigo": "92438", "quantidade": 18.0},
+        ],
+        bdi_pct=25.0,
+        csv_path=str(_ROOT / "data" / "sinapi_amostra.csv"),
+    )
+    bundles = [viga, pilar, sapata, fundacao, conduto, orcamento]
     ok = all(b["aprovado"] and "6.496/77" in b["aviso"] for b in bundles)
     print("SELFTEST OK" if ok else "SELFTEST FAIL")
     return 0 if ok else 1

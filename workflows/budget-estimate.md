@@ -1,64 +1,79 @@
-# Workflow: Estimativa de Orçamento
+# Workflow: Estimativa de Orçamento (custo direto + BDI)
 
 ## Gatilho
 
-Usuário solicita orçamento paramétrico ou detalhado de obra civil.
+Usuário solicita orçamento de obra civil a partir de quantitativos e preços tipo SINAPI.
+
+## Princípio
+
+Nenhum custo é inventado: preços vêm de `consultar_preco_sinapi` e a montagem de
+`montar_orcamento` (calc-server). Código fora da base => o agente se abstém. Toda saída
+termina com o aviso de responsabilidade técnica.
+
+> ⚠️ **Preços de amostra.** A base `data/sinapi_amostra.csv` é ILUSTRATIVA, só para
+> demonstração. Em uso real, substitua pela **SINAPI vigente e regional**
+> (desonerada/não desonerada, mês de referência e UF). Alerte sempre o usuário.
 
 ## Fluxo
 
-### Passo 1 — Identificar Tipo de Orçamento
+### Passo 1 — Levantar quantitativos
 
-- **Paramétrico:** estimativa rápida por m² ou unidade (precisão ±30%)
-- **Sintético:** por grandes grupos (fundação, estrutura, acabamento) (±20%)
-- **Analítico:** composição unitária detalhada com SINAPI (±10%)
+Extraia do projeto/pedido a lista de serviços e insumos com, para cada um:
 
-Perguntar ao usuário qual nível de detalhe é necessário.
+- `codigo` (código SINAPI do serviço/insumo);
+- `quantidade` (na unidade do código — confira a unidade antes).
 
-### Passo 2 — Coletar Dados
+Confirme com o usuário quando faltar quantidade ou houver dúvida de unidade. Não chute.
 
-- [ ] Tipo de obra (residencial, comercial, industrial, infraestrutura)
-- [ ] Área ou quantidade de serviço
-- [ ] Localização (estado/município para SINAPI regional)
-- [ ] Data de referência (mês/ano)
-- [ ] Padrão construtivo
+### Passo 2 — Conferir preços (opcional, item a item)
 
-### Passo 3 — Buscar Composições SINAPI
+Para validar um item isolado antes de montar a planilha:
 
-Chamar ferramenta MCP: `search_sinapi`
-- Entrada: descrição do serviço, UF, mês/ano
-- Saída: código SINAPI, custo unitário sem BDI
+```
+consultar_preco_sinapi(codigo="92873")
+→ {codigo, descricao, unidade, preco_unitario}
+```
 
-### Passo 4 — Calcular Quantitativos
+Código inexistente => erro: abstenha-se e peça o código correto da SINAPI vigente.
 
-Chamar ferramenta MCP: `calculate_quantities`
-- Entrada: projetos ou estimativas
-- Saída: quantitativos por serviço
+### Passo 3 — Definir o BDI
 
-### Passo 5 — Calcular BDI
+BDI (Benefícios e Despesas Indiretas) entra como **percentual único** sobre o custo
+direto, faixa aceita **[0, 40] %** (referência Acórdão TCU 2622/2013). A composição
+detalhada (administração central, risco, despesas financeiras, tributos, lucro) é
+responsabilidade do orçamentista — registre as premissas adotadas.
 
-Chamar ferramenta MCP: `calculate_bdi`
-- Componentes: administração central, risco, despesas financeiras, lucro
-- Referência: Acórdão TCU 2622/2013
+### Passo 4 — Montar o orçamento
 
-### Passo 6 — Montar Planilha Orçamentária
+```
+montar_orcamento(
+    itens=[{"codigo": "92873", "quantidade": 1.5},
+           {"codigo": "92915", "quantidade": 180.0}, ...],
+    bdi_pct=25.0,
+)
+```
 
-Chamar ferramenta MCP: `generate_budget_spreadsheet`
-- Formato: código SINAPI, descrição, unidade, quantidade, custo unit., total
-- Agrupamento por etapa da obra
+Retorna o pacote padrão: `resultado` (itens detalhados, subtotal, valor do BDI, total),
+`validacao`, `memorial_markdown`, `aviso` e `aprovado`.
 
-### Passo 7 — Curva ABC
+### Passo 5 — Validação automática
 
-Identificar os 20% de itens que representam 80% do custo (Pareto).
+A camada `lib/validators/budget_check.py` reverifica de forma determinística: preços > 0,
+quantidades ≥ 0, BDI na faixa, custo de cada item = quantidade × preço, subtotal = Σ
+custos e total = subtotal·(1 + BDI). Se `aprovado` for falso, **não apresente como final**
+— aponte o que reprovou e corrija.
 
-### Passo 8 — Gerar Documentação
+### Passo 6 — Memorial e documentação
 
-Planilha Excel formatada + relatório resumo + cronograma físico-financeiro básico
+Apresente o `memorial_markdown` (tabela de itens com qtd/preço/custo, subtotal, BDI,
+total + validação + aviso). Para consolidar com outros cálculos do projeto, registre o
+bundle (`registrar_calculo_no_projeto`) e gere o relatório (`gerar_relatorio_projeto`)
+pelo agente `report`.
 
-## Saída Esperada
+## Saída esperada
 
-1. Planilha orçamentária completa (Excel)
-2. Resumo por etapa e total geral
-3. BDI calculado e justificado
-4. Curva ABC dos principais itens
-5. Prazo estimado de execução
-6. Cronograma físico-financeiro (percentual por mês)
+1. Tabela orçamentária (código, descrição, unidade, quantidade, preço unit., custo).
+2. Subtotal (custo direto), BDI aplicado e total geral.
+3. Relatório de validação aritmética (aprovado/reprovado).
+4. Alerta de que os preços são de amostra e devem ser atualizados.
+5. Aviso de responsabilidade técnica (obrigatório).

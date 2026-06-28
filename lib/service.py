@@ -6,6 +6,8 @@ fora da camada de transporte (o server é só um adaptador fino).
 
 from __future__ import annotations
 
+from lib.budget.estimate import montar_orcamento
+from lib.budget.sinapi import load_sinapi
 from lib.concrete.beams import design_rectangular_beam
 from lib.concrete.columns import design_rectangular_column
 from lib.concrete.footings import design_square_footing
@@ -41,10 +43,12 @@ from lib.reporting.memorial import (
     render_footing_memorial,
     render_head_loss_memorial,
     render_open_channel_memorial,
+    render_orcamento_memorial,
     render_pile_comparison_memorial,
     render_pipe_flow_memorial,
     render_slab_memorial,
 )
+from lib.validators.budget_check import validate_orcamento
 from lib.validators.geotech_check import (
     validate_bearing,
     validate_earth_pressure,
@@ -383,4 +387,26 @@ def solve_head_loss(
     )
     rep = validate_head_loss(r)
     memorial = render_head_loss_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+# ====================================================================== ORÇAMENTO
+
+
+def solve_orcamento(
+    itens: list[dict],
+    bdi_pct: float = 0.0,
+    csv_path: str = "data/sinapi_amostra.csv",
+) -> dict:
+    """Monta um orçamento (custo direto + BDI) e devolve o pacote completo.
+
+    ``itens`` é a lista de quantitativos ``{codigo, quantidade}``; os preços vêm da
+    base tipo SINAPI em ``csv_path`` (amostra ILUSTRATIVA por padrão). Carrega a base,
+    monta o orçamento, valida a aritmética e gera o memorial. Propaga as abstenções dos
+    núcleos (código inexistente, BDI fora de [0,40] %, quantidade negativa, lista vazia).
+    """
+    base = load_sinapi(csv_path)
+    r = montar_orcamento(itens, base, bdi_pct=bdi_pct)
+    rep = validate_orcamento(r)
+    memorial = render_orcamento_memorial(r, rep)
     return _bundle(r, rep, memorial)
