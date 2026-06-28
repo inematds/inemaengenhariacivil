@@ -7,10 +7,28 @@ equilíbrio. Determinístico, sem LLM.
 from __future__ import annotations
 
 from lib.concrete.beams import ALPHA_C, LAMBDA, BeamFlexureResult
-from lib.validators.normative_check import check_normative_beam
-from lib.validators.physical_check import check_physical_beam
+from lib.concrete.columns import ColumnResult, column_moment_capacity
+from lib.concrete.footings import FootingResult
+from lib.concrete.slabs import SlabResult
+from lib.validators.normative_check import (
+    check_normative_beam,
+    check_normative_column,
+    check_normative_footing,
+    check_normative_slab,
+)
+from lib.validators.physical_check import (
+    check_physical_beam,
+    check_physical_column,
+    check_physical_footing,
+    check_physical_slab,
+)
 from lib.validators.report import Check, ValidationReport
-from lib.validators.units_check import check_units_beam
+from lib.validators.units_check import (
+    check_units_beam,
+    check_units_column,
+    check_units_footing,
+    check_units_slab,
+)
 
 
 def check_equilibrium_beam(r: BeamFlexureResult) -> Check:
@@ -44,6 +62,61 @@ def validate_beam(r: BeamFlexureResult) -> ValidationReport:
     equi = check_equilibrium_beam(r)
 
     checks = [units, _fold("physical", phys), _fold("normative", norm), equi]
+    passed = not any(c.status == "fail" for c in checks)
+
+    warnings = [c.detail for c in (phys + norm) if c.status == "warning"]
+    warnings += list(r.warnings)
+
+    return ValidationReport(passed=passed, checks=checks, warnings=warnings)
+
+
+def validate_footing(r: FootingResult) -> ValidationReport:
+    """Validação obrigatória de uma sapata: unidades, física e normativa (NBR 6122/6118)."""
+    phys = check_physical_footing(r)
+    norm = check_normative_footing(r)
+    units = check_units_footing(r)
+
+    checks = [units, _fold("physical", phys), _fold("normative", norm)]
+    passed = not any(c.status == "fail" for c in checks)
+
+    warnings = [c.detail for c in (phys + norm) if c.status == "warning"]
+    warnings += list(r.warnings)
+
+    return ValidationReport(passed=passed, checks=checks, warnings=warnings)
+
+
+def check_capacity_column(r: ColumnResult) -> Check:
+    """Capacidade da seção em flexão composta ≥ solicitação (Nd, Md,tot)."""
+    mrd = column_moment_capacity(r.nd_kn, r.as_adopted_cm2, r.b_cm, r.h_cm,
+                                 r.d_linha_cm, r.fck_mpa, r.fyk_mpa)
+    ok = mrd >= r.md_tot_knm - 1e-2 * max(abs(r.md_tot_knm), 1.0)
+    return Check(name="capacidade", status="ok" if ok else "fail",
+                 detail=f"MRd={mrd:.1f} ≥ Md,tot={r.md_tot_knm:.1f} kN·m (N=Nd)")
+
+
+def validate_column(r: ColumnResult) -> ValidationReport:
+    """Validação obrigatória de um pilar: unidades, física, normativa e capacidade."""
+    phys = check_physical_column(r)
+    norm = check_normative_column(r)
+    units = check_units_column(r)
+    cap = check_capacity_column(r)
+
+    checks = [units, _fold("physical", phys), _fold("normative", norm), cap]
+    passed = not any(c.status == "fail" for c in checks)
+
+    warnings = [c.detail for c in (phys + norm) if c.status == "warning"]
+    warnings += list(r.warnings)
+
+    return ValidationReport(passed=passed, checks=checks, warnings=warnings)
+
+
+def validate_slab(r: SlabResult) -> ValidationReport:
+    """Validação obrigatória de uma laje: unidades, física e normativa (NBR 6118)."""
+    phys = check_physical_slab(r)
+    norm = check_normative_slab(r)
+    units = check_units_slab(r)
+
+    checks = [units, _fold("physical", phys), _fold("normative", norm)]
     passed = not any(c.status == "fail" for c in checks)
 
     warnings = [c.detail for c in (phys + norm) if c.status == "warning"]
