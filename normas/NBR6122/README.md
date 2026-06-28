@@ -11,9 +11,13 @@
 
 | Arquivo | Conteúdo |
 |---------|---------|
-| `tabela_coeficientes_aoki.json` | Coeficientes K e α para Aoki-Velloso |
-| `tabela_coeficientes_decourt.json` | Coeficientes para Décourt-Quaresma |
-| `tabela_tensao_admissivel.json` | Tensões admissíveis para fundações diretas |
+| `tables/aoki_velloso_k_alpha.json` | Coeficientes K (kPa) e α por tipo de solo (Aoki-Velloso) |
+| `tables/aoki_velloso_f1_f2.json` | Fatores F1 e F2 por tipo de estaca (Aoki-Velloso) |
+| `tables/decourt_c.json` | Coeficiente C (kPa) por tipo de solo (Décourt-Quaresma) |
+
+> As três tabelas espelham os valores hardcoded em `lib/geotechnical/piles.py`
+> (`AOKI_SOLO`, `AOKI_F1F2`, `DECOURT_C`) — servem como fonte de consulta e são
+> verificadas em `tests/unit/test_service_phase3.py`.
 
 ## Métodos de Capacidade de Carga
 

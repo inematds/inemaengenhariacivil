@@ -1,0 +1,23 @@
+{
+  "fonte": "Aoki, N.; Velloso, D.A. (1975) — coeficientes K e α por tipo de solo",
+  "norma": "NBR 6122",
+  "unidades": {"K": "kPa", "alpha": "adimensional (fração)"},
+  "nota": "Valores espelham lib/geotechnical/piles.py (AOKI_SOLO). qp = K·Np/F1; rl = α·K·Nl/F2.",
+  "solos": {
+    "areia": {"K_kpa": 1000.0, "alpha": 0.014},
+    "areia siltosa": {"K_kpa": 800.0, "alpha": 0.020},
+    "areia silto-argilosa": {"K_kpa": 700.0, "alpha": 0.024},
+    "areia argilosa": {"K_kpa": 600.0, "alpha": 0.030},
+    "areia argilo-siltosa": {"K_kpa": 500.0, "alpha": 0.028},
+    "silte": {"K_kpa": 400.0, "alpha": 0.030},
+    "silte arenoso": {"K_kpa": 550.0, "alpha": 0.022},
+    "silte areno-argiloso": {"K_kpa": 450.0, "alpha": 0.028},
+    "silte argiloso": {"K_kpa": 230.0, "alpha": 0.034},
+    "silte argilo-arenoso": {"K_kpa": 250.0, "alpha": 0.030},
+    "argila": {"K_kpa": 200.0, "alpha": 0.060},
+    "argila arenosa": {"K_kpa": 350.0, "alpha": 0.024},
+    "argila areno-siltosa": {"K_kpa": 300.0, "alpha": 0.028},
+    "argila siltosa": {"K_kpa": 220.0, "alpha": 0.040},
+    "argila silto-arenosa": {"K_kpa": 330.0, "alpha": 0.030}
+  }
+}

@@ -10,13 +10,53 @@ from lib.concrete.beams import design_rectangular_beam
 from lib.concrete.columns import design_rectangular_column
 from lib.concrete.footings import design_square_footing
 from lib.concrete.slabs import design_one_way_slab, design_two_way_slab
+from lib.geotechnical.bearing_capacity import design_bearing_capacity
+from lib.geotechnical.earth_pressure import (
+    coulomb_earth_pressure,
+    rankine_earth_pressure,
+)
+from lib.geotechnical.piles import SoilLayer, comparar_metodos_estaca
+from lib.geotechnical.settlement import (
+    consolidation_settlement,
+    elastic_settlement,
+)
+from lib.hydraulic.head_loss import total_head_loss
+from lib.hydraulic.open_channel import (
+    manning_circular,
+    manning_rectangular,
+    manning_trapezoidal,
+)
+from lib.hydraulic.pipe_flow import (
+    pipe_flow_darcy_weisbach,
+    pipe_flow_hazen_williams,
+)
 from lib.reporting.disclaimer import DISCLAIMER
 from lib.reporting.memorial import (
+    render_bearing_capacity_memorial,
     render_beam_memorial,
     render_column_memorial,
+    render_consolidation_settlement_memorial,
+    render_earth_pressure_memorial,
+    render_elastic_settlement_memorial,
     render_footing_memorial,
+    render_head_loss_memorial,
+    render_open_channel_memorial,
+    render_pile_comparison_memorial,
+    render_pipe_flow_memorial,
     render_slab_memorial,
 )
+from lib.validators.geotech_check import (
+    validate_bearing,
+    validate_earth_pressure,
+    validate_pile,
+    validate_settlement,
+)
+from lib.validators.hydraulic_check import (
+    validate_head_loss,
+    validate_open_channel,
+    validate_pipe_flow,
+)
+from lib.validators.report import Check, ValidationReport
 from lib.validators.validate import (
     validate_beam,
     validate_column,
@@ -150,4 +190,197 @@ def solve_two_way_slab(
     )
     rep = validate_slab(r)
     memorial = render_slab_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+# ====================================================================== GEOTECNIA
+
+
+def solve_bearing_capacity(
+    c_kpa: float,
+    phi_deg: float,
+    gamma_kn_m3: float,
+    b_m: float,
+    depth_df_m: float,
+    shape: str = "quadrada",
+    l_m: float | None = None,
+    fs: float = 3.0,
+) -> dict:
+    """Resolve a capacidade de carga de fundação rasa (Vesic) — pacote completo."""
+    r = design_bearing_capacity(
+        c_kpa=c_kpa, phi_deg=phi_deg, gamma_kn_m3=gamma_kn_m3, b_m=b_m,
+        depth_df_m=depth_df_m, shape=shape, l_m=l_m, fs=fs,
+    )
+    rep = validate_bearing(r)
+    memorial = render_bearing_capacity_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_elastic_settlement(
+    q_kpa: float,
+    b_m: float,
+    poisson_nu: float,
+    iw: float,
+    es_kpa: float,
+) -> dict:
+    """Resolve o recalque elástico imediato — pacote completo."""
+    r = elastic_settlement(q_kpa=q_kpa, b_m=b_m, poisson_nu=poisson_nu, iw=iw, es_kpa=es_kpa)
+    rep = validate_settlement(r)
+    memorial = render_elastic_settlement_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_consolidation_settlement(
+    cc: float,
+    e0: float,
+    h_m: float,
+    sigma0_kpa: float,
+    delta_sigma_kpa: float,
+) -> dict:
+    """Resolve o recalque por adensamento primário (Terzaghi) — pacote completo."""
+    r = consolidation_settlement(
+        cc=cc, e0=e0, h_m=h_m, sigma0_kpa=sigma0_kpa, delta_sigma_kpa=delta_sigma_kpa,
+    )
+    rep = validate_settlement(r)
+    memorial = render_consolidation_settlement_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_earth_pressure_rankine(
+    gamma_kn_m3: float,
+    h_m: float,
+    phi_deg: float,
+) -> dict:
+    """Resolve o empuxo de terra de Rankine — pacote completo."""
+    r = rankine_earth_pressure(gamma_kn_m3=gamma_kn_m3, h_m=h_m, phi_deg=phi_deg)
+    rep = validate_earth_pressure(r)
+    memorial = render_earth_pressure_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_earth_pressure_coulomb(
+    gamma_kn_m3: float,
+    h_m: float,
+    phi_deg: float,
+    delta_deg: float = 0.0,
+    beta_deg: float = 0.0,
+    alpha_deg: float = 0.0,
+) -> dict:
+    """Resolve o empuxo de terra de Coulomb (δ, β, α) — pacote completo."""
+    r = coulomb_earth_pressure(
+        gamma_kn_m3=gamma_kn_m3, h_m=h_m, phi_deg=phi_deg,
+        delta_deg=delta_deg, beta_deg=beta_deg, alpha_deg=alpha_deg,
+    )
+    rep = validate_earth_pressure(r)
+    memorial = render_earth_pressure_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def _combine_pile_reports(r, rep_a: ValidationReport, rep_d: ValidationReport) -> ValidationReport:
+    """Junta as validações dos dois métodos + a checagem de convergência num só relatório."""
+    checks: list[Check] = []
+    for c in rep_a.checks:
+        checks.append(Check(name=f"Aoki/{c.name}", status=c.status, detail=c.detail))
+    for c in rep_d.checks:
+        checks.append(Check(name=f"Décourt/{c.name}", status=c.status, detail=c.detail))
+    checks.append(Check(
+        name="convergencia",
+        status="ok" if r.convergem else "warning",
+        detail=f"divergência {r.divergencia_pct:.1f}% (limite 20%)",
+    ))
+    passed = rep_a.passed and rep_d.passed
+    warnings = list(rep_a.warnings) + list(rep_d.warnings) + list(r.warnings)
+    return ValidationReport(passed=passed, checks=checks, warnings=warnings)
+
+
+def solve_pile_comparison(
+    layers: list[dict | SoilLayer],
+    pile_type: str,
+    diameter_m: float,
+    fs: float = 2.0,
+    tol: float = 0.20,
+) -> dict:
+    """Compara Aoki-Velloso × Décourt-Quaresma, valida ambos e gera memorial comparativo."""
+    parsed = [ly if isinstance(ly, SoilLayer) else SoilLayer(**ly) for ly in layers]
+    r = comparar_metodos_estaca(parsed, pile_type, diameter_m, fs=fs, tol=tol)
+    rep_a = validate_pile(r.aoki)
+    rep_d = validate_pile(r.decourt)
+    rep = _combine_pile_reports(r, rep_a, rep_d)
+    memorial = render_pile_comparison_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+# ====================================================================== HIDRÁULICA
+
+
+def solve_pipe_flow(
+    Q_m3s: float,
+    D_m: float,
+    L_m: float,
+    metodo: str = "hazen-williams",
+    C: float = 130.0,
+    eps_m: float | None = None,
+    nu_m2s: float = 1.0e-6,
+) -> dict:
+    """Resolve o escoamento em conduto forçado (Hazen-Williams ou Darcy-Weisbach)."""
+    m = metodo.strip().lower()
+    if m in ("hw", "hazen-williams", "hazen_williams"):
+        r = pipe_flow_hazen_williams(Q_m3s=Q_m3s, D_m=D_m, L_m=L_m, C=C)
+    elif m in ("dw", "darcy-weisbach", "darcy_weisbach"):
+        if eps_m is None:
+            raise ValueError("Darcy-Weisbach exige a rugosidade absoluta eps_m (m).")
+        r = pipe_flow_darcy_weisbach(Q_m3s=Q_m3s, D_m=D_m, L_m=L_m, eps_m=eps_m, nu_m2s=nu_m2s)
+    else:
+        raise ValueError(
+            f"Método '{metodo}' não suportado; use 'hazen-williams' ou 'darcy-weisbach'."
+        )
+    rep = validate_pipe_flow(r)
+    memorial = render_pipe_flow_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_open_channel(
+    geometria: str,
+    n: float,
+    S: float,
+    y_m: float,
+    b_m: float | None = None,
+    z: float | None = None,
+    D_m: float | None = None,
+) -> dict:
+    """Resolve o escoamento uniforme em canal aberto (Manning) por geometria."""
+    g = geometria.strip().lower()
+    if g == "retangular":
+        if b_m is None:
+            raise ValueError("Canal retangular exige a largura de fundo b_m.")
+        r = manning_rectangular(b_m=b_m, y_m=y_m, n=n, S=S)
+    elif g == "trapezoidal":
+        if b_m is None or z is None:
+            raise ValueError("Canal trapezoidal exige b_m e talude z.")
+        r = manning_trapezoidal(b_m=b_m, y_m=y_m, z=z, n=n, S=S)
+    elif g == "circular":
+        if D_m is None:
+            raise ValueError("Conduto circular exige o diâmetro D_m.")
+        r = manning_circular(D_m=D_m, y_m=y_m, n=n, S=S)
+    else:
+        raise ValueError(
+            f"Geometria '{geometria}' não suportada; use "
+            "'retangular', 'trapezoidal' ou 'circular'."
+        )
+    rep = validate_open_channel(r)
+    memorial = render_open_channel_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_head_loss(
+    hf_distribuida_m: float,
+    singularidades: dict[str, int],
+    V_ms: float,
+) -> dict:
+    """Resolve a perda de carga total (distribuída + localizadas) — pacote completo."""
+    r = total_head_loss(
+        hf_distribuida_m=hf_distribuida_m, singularidades=singularidades, V_ms=V_ms,
+    )
+    rep = validate_head_loss(r)
+    memorial = render_head_loss_memorial(r, rep)
     return _bundle(r, rep, memorial)

@@ -1,65 +1,76 @@
-# Workflow: Dimensionamento de Fundação em Estacas
+# Workflow: Capacidade de Carga de Fundação em Estacas (por SPT)
 
 ## Gatilho
 
-Usuário solicita projeto ou verificação de fundação em estacas.
+Usuário solicita a capacidade de carga de uma estaca a partir de sondagem SPT.
 
-## Fluxo
+## Princípio
 
-### Passo 1 — Coletar Dados
+Números só vêm do `calc-server` (MCP). A ferramenta `capacidade_estaca` roda os **dois
+métodos semiempíricos** (Aoki-Velloso e Décourt-Quaresma), valida ambos e compara o
+resultado — o agente nunca calcula à mão (princípio da abstenção).
 
-- [ ] Carga do pilar (Nd, Msd)
-- [ ] Sondagem SPT disponível (número de golpes por camada)
-- [ ] Tipo de estaca pretendido (pré-moldada, hélice, franki, etc.)
-- [ ] Restrições de execução (vibração, barulho, espaço)
+## Fluxo real
 
-### Passo 2 — Análise da Sondagem
+### Passo 1 — Coletar dados
 
-Chamar ferramenta MCP: `analyze_spt`
-- Entrada: planilha SPT (profundidade, Nspt por camada, tipo de solo)
-- Saída: perfil estratigráfico simplificado
+- [ ] Perfil de sondagem SPT: para cada camada atravessada, o número de golpes `N`, o
+      tipo de solo (texto da tabela de Aoki-Velloso) e a espessura (m). A ponta da estaca
+      fica na base da última camada; o comprimento L é a soma das espessuras.
+- [ ] Tipo de estaca: `pre-moldada`, `metalica`, `franki` ou `escavada`.
+- [ ] Diâmetro D (m).
+- [ ] Fator de segurança global FS (default 2,0, NBR 6122).
 
-### Passo 3 — Capacidade de Carga (Dois Métodos)
+### Passo 2 — Montar o perfil
 
-Chamar em paralelo:
-- `calculate_pile_aoki_velloso` — método Aoki-Velloso
-- `calculate_pile_decourt` — método Décourt-Quaresma
+Estruture o perfil como a lista `layers` de objetos:
 
-### Passo 4 — Comparação de Métodos
+```json
+[
+  {"n_spt": 8,  "soil_type": "argila siltosa", "thickness_m": 4.0},
+  {"n_spt": 20, "soil_type": "areia siltosa",  "thickness_m": 6.0}
+]
+```
 
-Chamar ferramenta MCP: `compare_pile_methods`
-- Se divergência > 20%: alertar engenheiro
-- Adotar valor mais conservador
+Tabelas de consulta (espelham o núcleo): `normas/NBR6122/tables/aoki_velloso_k_alpha.json`,
+`aoki_velloso_f1_f2.json` e `decourt_c.json`.
 
-### Passo 5 — Definir Número de Estacas
+### Passo 3 — Calcular e comparar (uma chamada)
 
-Chamar ferramenta MCP: `design_pile_group`
-- Entrada: Nd, capacidade por estaca, tipo de bloco
-- Saída: número de estacas, arranjo, dimensões do bloco
+Chamar a ferramenta MCP `capacidade_estaca`:
 
-### Passo 6 — Dimensionar o Bloco
+```
+capacidade_estaca(layers, pile_type="pre-moldada", diameter_m=0.30, fs=2.0, tol=0.20)
+```
 
-Chamar ferramenta MCP: `design_pile_cap`
-- Entrada: número de estacas, Nd, Msd, fck
-- Saída: armadura do bloco (modelo de biela-tirante)
+Internamente (`lib.service.solve_pile_comparison` → `comparar_metodos_estaca`):
+- **Aoki-Velloso (1975):** Rp = (K·Np/F1)·Ap ; Rl = Σ (α·K·Nl/F2)·U·ΔL.
+- **Décourt-Quaresma (1978):** Rp = C·Np·Ap ; Rl = 10·(Ns/3 + 1)·U·L.
+- **Comparação:** divergência relativa de Rult; `convergem = divergência ≤ 20%`.
 
-### Passo 7 — Validação Completa
+### Passo 4 — Validação automática
 
-Pipeline automático de validação:
-- Capacidade de carga verificada (FS >= 2.0)
-- Recalque estimado
-- Verificação do bloco (punção, flexão)
+A resposta traz `validacao` com as checagens de **ambos** os métodos (unidades, física,
+normativa, FS) e a checagem de **convergência**:
+- Se a divergência > 20%: a validação emite **aviso** e `convergem = false` — alertar o
+  engenheiro e adotar o valor mais conservador (menor Radm).
+- `aprovado` reflete a validação dos dois métodos (a divergência entra como aviso).
 
-### Passo 8 — Gerar Documentação
+### Passo 5 — Apresentar
 
-Memorial + planilha + planta de locação de estacas (descrição textual)
+Apresente o `memorial_markdown` retornado (tabela Aoki × Décourt com Rp/Rl/Rult/Radm e a
+divergência) e o aviso de responsabilidade (`aviso`).
 
-## Saída Esperada
+## Saída esperada
 
-1. Tipo e diâmetro da estaca recomendados
-2. Comprimento estimado
-3. Número de estacas por pilar
-4. Dimensões e armadura do bloco
-5. Comparativo dos dois métodos
-6. Alertas de divergência (se houver)
-7. Memorial de cálculo completo
+1. Rult e Radm por cada método (Aoki-Velloso e Décourt-Quaresma).
+2. Divergência relativa e situação de convergência (≤ 20%).
+3. Comprimento e geometria da estaca consideradas.
+4. Memorial de cálculo comparativo completo.
+5. Alerta de divergência (se houver) e o aviso de responsabilidade técnica.
+
+## Fora do escopo (abster-se)
+
+Definição do número de estacas e arranjo, dimensionamento do bloco de coroamento
+(biela-tirante), recalque do grupo, atrito negativo e prova de carga — não há ferramenta:
+avisar o usuário. A escolha do método de execução e do FS é do engenheiro.

@@ -1,0 +1,23 @@
+{
+  "fonte": "Décourt-Quaresma (1978) — coeficiente C por tipo de solo",
+  "norma": "NBR 6122",
+  "unidades": {"C": "kPa"},
+  "nota": "Valores espelham lib/geotechnical/piles.py (DECOURT_C). qp = C·Np; rl = 10·(Ns/3 + 1) kPa.",
+  "solos": {
+    "areia": {"C_kpa": 400.0},
+    "areia siltosa": {"C_kpa": 400.0},
+    "areia silto-argilosa": {"C_kpa": 400.0},
+    "areia argilosa": {"C_kpa": 400.0},
+    "areia argilo-siltosa": {"C_kpa": 400.0},
+    "silte": {"C_kpa": 250.0},
+    "silte arenoso": {"C_kpa": 250.0},
+    "silte areno-argiloso": {"C_kpa": 250.0},
+    "silte argiloso": {"C_kpa": 200.0},
+    "silte argilo-arenoso": {"C_kpa": 200.0},
+    "argila": {"C_kpa": 120.0},
+    "argila arenosa": {"C_kpa": 120.0},
+    "argila areno-siltosa": {"C_kpa": 120.0},
+    "argila siltosa": {"C_kpa": 120.0},
+    "argila silto-arenosa": {"C_kpa": 120.0}
+  }
+}

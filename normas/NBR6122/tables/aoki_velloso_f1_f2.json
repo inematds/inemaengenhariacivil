@@ -1,0 +1,12 @@
+{
+  "fonte": "Aoki-Velloso (1975) — fatores F1 e F2 por tipo de estaca",
+  "norma": "NBR 6122",
+  "unidades": {"F1": "adimensional", "F2": "adimensional"},
+  "nota": "Valores espelham lib/geotechnical/piles.py (AOKI_F1F2). F2 = 2·F1.",
+  "estacas": {
+    "pre-moldada": {"F1": 1.75, "F2": 3.5},
+    "metalica": {"F1": 1.75, "F2": 3.5},
+    "franki": {"F1": 2.5, "F2": 5.0},
+    "escavada": {"F1": 3.0, "F2": 6.0}
+  }
+}
