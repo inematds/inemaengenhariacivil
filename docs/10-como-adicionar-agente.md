@@ -1,89 +1,135 @@
 # Como Adicionar um Novo Agente
 
+Um **agente** é a camada de *persona* da plataforma: um `SKILL.md` que lê o pedido em
+linguagem natural, escolhe a(s) ferramenta(s) MCP de cálculo, apresenta o memorial e
+reforça a abstenção e o disclaimer. **O agente não faz contas** — todo número vem das
+ferramentas MCP do `calc-server` (que por sua vez chamam a engine Python determinística).
+
+> **Pré-requisito.** Um agente só pode acionar uma ferramenta que já exista. Se o cálculo
+> ainda não tem núcleo/validador/memorial/`solve_*`/ferramenta MCP, crie-o **primeiro**
+> seguindo [`11-como-adicionar-skill.md`](11-como-adicionar-skill.md). Adicionar um agente
+> não adiciona capacidade de cálculo — só dá uma porta de entrada e roteamento a ela.
+
+## Onde o agente vive
+
+Cada agente é uma pasta sob `agents/` com um único arquivo `SKILL.md`. A organização é
+plana, uma pasta por agente (não aninhada por domínio):
+
+```
+agents/
+├── concrete/SKILL.md
+├── foundations/SKILL.md
+├── earthwork/SKILL.md
+├── orchestrator/SKILL.md     # roteador central
+└── <novo-agente>/SKILL.md    # o seu
+```
+
 ## Passo a Passo
 
-### 1. Criar a pasta do agente
+### 1. Decidir: novo agente ou expandir um existente?
+
+- **Novo agente:** um domínio/persona novo, com intenções de ativação próprias e um
+  conjunto coeso de ferramentas (ex.: `pavement`, `slope-stability`).
+- **Expandir existente:** o cálculo é vizinho de um agente que já existe (mesma persona,
+  mesmas intenções). Nesse caso só adicione a nova ferramenta ao `Fluxo`/`Escopo` do
+  `SKILL.md` existente — não crie pasta nova.
+
+### 2. Criar a pasta e o `SKILL.md`
 
 ```bash
-mkdir -p agents/<domínio>/<nome-do-agente>
+mkdir -p agents/<novo-agente>
+$EDITOR agents/<novo-agente>/SKILL.md
 ```
 
-Exemplos:
-- `agents/structural/prestressed/` — concreto protendido
-- `agents/hydraulic/irrigation/` — irrigação agrícola
+### 3. Escrever o `SKILL.md` (frontmatter + seções)
 
-### 2. Criar o SKILL.md
-
-```bash
-touch agents/<domínio>/<nome-do-agente>/SKILL.md
-```
-
-### 3. Estrutura do SKILL.md
+Siga o padrão dos agentes atuais (ex.: `agents/earthwork/SKILL.md`). O arquivo tem um
+**frontmatter YAML** (`name` + `description` orientada a ativação) e seções fixas:
 
 ```markdown
-# Agente: <Nome do Agente>
+---
+name: <novo-agente>
+description: >-
+  Use quando o usuário pedir <intenções de ativação em linguagem natural>. Interpreta
+  o problema, chama a ferramenta MCP de cálculo e apresenta o memorial. NÃO faz contas.
+---
 
-## Responsabilidade
+# Agente — <Título legível>
 
-Uma frase descrevendo exatamente o que este agente faz.
-Uma frase descrevendo exatamente o que este agente NÃO faz.
+## Princípio inegociável
 
-## Ativação
+**Você não faz aritmética.** Todo número vem da ferramenta MCP `<nome_da_ferramenta>`
+do `calc-server`. Se a ferramenta não existir, ou o pedido fugir do que ela calcula,
+**diga que não há ferramenta para isso e abstenha-se** — nunca invente valores
+(ver `listar_capacidades`).
 
-Quando o usuário pedir: [lista de intenções que ativam este agente]
+## Fluxo
 
-## Ferramentas MCP Disponíveis
+1. **Interprete** o enunciado e extraia os parâmetros de entrada (com unidades).
+2. **Confirme hipóteses** faltantes com o usuário em texto livre (nunca chute carga,
+   geometria, σ_adm, etc.).
+3. **Chame** `<nome_da_ferramenta>(...)` com os dados extraídos.
+4. **Apresente** o `memorial_markdown` retornado e explique o resultado.
+5. **Verifique a validação**: se `aprovado` for falso, NÃO apresente como solução final —
+   aponte o que reprovou e oriente.
+6. **Sempre** termine com o aviso de responsabilidade técnica retornado (`aviso`).
 
-- `ferramenta_um` — descrição
-- `ferramenta_dois` — descrição
+## Escopo
 
-## Normas de Referência
+- ✅ [o que a ferramenta cobre]
+- ❌ [o que fica de fora — avise que não há ferramenta e abstenha-se]
 
-- NBR XXXX:AAAA — título
-- NBR YYYY:BBBB — título
+## Limites legais
 
-## Fluxo de Trabalho
-
-1. Interpretar o problema
-2. Identificar parâmetros necessários
-3. Chamar ferramenta MCP adequada
-4. Validar resultado
-5. Gerar memorial
-6. Emitir aviso de responsabilidade
-
-## Aviso Obrigatório
-
-[Incluir sempre o aviso padrão de responsabilidade técnica]
-
-## Limitações
-
-- [O que este agente não cobre]
-- [Quando escalar para o engenheiro]
+O cálculo é suporte à decisão. A responsabilidade técnica é do engenheiro responsável,
+formalizada via ART (Lei 6.496/77, Lei 5.194/66, Resolução CONFEA/CREA).
 ```
+
+Pontos não negociáveis (são o que diferencia esta plataforma):
+
+- **Abstenção explícita.** O agente deve recusar o que não está em `listar_capacidades`
+  em vez de inventar números.
+- **Validação antes de apresentar.** Sempre olhar `aprovado`/`validacao` do bundle.
+- **Disclaimer obrigatório.** A resposta termina com o `aviso` retornado pela ferramenta
+  (que cita a Lei 6.496/77) — ele nunca é redigido pelo agente.
 
 ### 4. Registrar no Orchestrator
 
-Abrir `agents/orchestrator/SKILL.md` e adicionar na tabela de roteamento:
+Abra `agents/orchestrator/SKILL.md` e acrescente uma linha na tabela **Roteamento por
+domínio**, ligando os sinais do pedido ao novo agente:
 
 ```markdown
-| <domínio>/<nome> | [palavras-chave de ativação] |
+| <palavras-chave que ativam> | <Domínio> | `<novo-agente>` |
 ```
 
-### 5. Criar testes E2E (se necessário)
+Se o agente trouxer um domínio inédito, atualize também a seção **Escopo atual da
+plataforma** do orquestrador.
 
-```bash
-touch tests/integration/test_<nome>_agent.py
-```
+### 5. Garantir a cobertura E2E
+
+A capacidade que o agente expõe já deve estar coberta pela suíte E2E
+(`tests/integration/test_e2e_dominios.py`), que exercita cada `solve_*` de ponta a ponta.
+Se o agente expõe uma ferramenta nova, acrescente o caso aprovado correspondente ao
+dicionário `_CASOS_APROVADOS` daquela suíte (ver
+[`11-como-adicionar-skill.md`](11-como-adicionar-skill.md), passo de testes).
+
+### 6. (Opcional) Exemplo de uso
+
+Adicione um caso real em `examples/<nome>/` (`README.md` com o enunciado +
+`solution.md` com a saída esperada), no padrão dos exemplos existentes.
 
 ---
 
 ## Checklist de Novo Agente
 
-- [ ] Pasta criada em `agents/`
-- [ ] SKILL.md com responsabilidade claramente definida
-- [ ] Ferramentas MCP listadas
-- [ ] Normas de referência citadas
-- [ ] Aviso de responsabilidade incluído
-- [ ] Limitações documentadas
-- [ ] Registrado no orchestrator
-- [ ] Exemplo de uso documentado
+- [ ] A ferramenta MCP que o agente usa já existe (senão, ver `11-como-adicionar-skill.md`)
+- [ ] Pasta `agents/<nome>/` criada com `SKILL.md`
+- [ ] Frontmatter YAML (`name`, `description` de ativação) preenchido
+- [ ] Princípio inegociável de abstenção presente ("não faço contas")
+- [ ] Fluxo lista a(s) ferramenta(s) MCP reais por nome
+- [ ] Escopo ✅/❌ explícito (o que NÃO cobre é abstenção, não chute)
+- [ ] Verificação de `aprovado`/`validacao` antes de apresentar
+- [ ] Aviso de responsabilidade técnica (`aviso`) ao final
+- [ ] Registrado na tabela de roteamento do `orchestrator`
+- [ ] Caso aprovado coberto na suíte E2E
+- [ ] (Opcional) Exemplo em `examples/<nome>/`

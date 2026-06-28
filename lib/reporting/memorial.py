@@ -7,6 +7,7 @@ from lib.concrete.beams import BeamFlexureResult
 from lib.concrete.columns import ColumnResult
 from lib.concrete.footings import FootingResult
 from lib.concrete.slabs import SlabResult
+from lib.earthwork.volumes import EarthworkResult
 from lib.geotechnical.bearing_capacity import BearingCapacityResult
 from lib.geotechnical.earth_pressure import (
     CoulombEarthPressureResult,
@@ -17,9 +18,14 @@ from lib.geotechnical.settlement import (
     ConsolidationSettlementResult,
     ElasticSettlementResult,
 )
+from lib.geotechnical.slope_stability import (
+    FelleniusResult,
+    InfiniteSlopeResult,
+)
 from lib.hydraulic.head_loss import HeadLossResult
 from lib.hydraulic.open_channel import OpenChannelResult
 from lib.hydraulic.pipe_flow import PipeFlowResult
+from lib.pavement.flexible import PavementResult
 from lib.reporting.disclaimer import DISCLAIMER
 from lib.steel.connections import BoltedConnectionResult, WeldResult
 from lib.steel.stability import CompressionResult
@@ -776,6 +782,183 @@ def render_weld_memorial(r: WeldResult, rep: ValidationReport) -> str:
     add("")
 
     linhas += _validation_section(rep, 4)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+# ============================================== PAVIMENTO / TERRAPLENAGEM / TALUDES
+
+
+def render_pavement_memorial(r: PavementResult, rep: ValidationReport) -> str:
+    """Memorial do dimensionamento de pavimento flexível (método DNER/DNIT, CBR/N)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Pavimento Flexível (DNER/DNIT)")
+    add("")
+    add(f"**Método:** {r.metodo}  ")
+    add("**Referência:** DNER (1981) / DNIT (2006), Manual de Pavimentação")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| CBR do subleito | {r.cbr_subleito:.1f}% |")
+    if r.cbr_reforco is not None:
+        add(f"| CBR do reforço | {r.cbr_reforco:.1f}% |")
+    add(f"| Número N de tráfego | {r.n_trafego:.3g} |")
+    add(f"| Coeficiente K do revestimento | {r.k_rev:.1f} |")
+    add(f"| Coeficiente K da base | {r.k_base:.1f} |")
+    add(f"| Coeficiente K da sub-base | {r.k_subbase:.1f} |")
+    if r.cbr_reforco is not None:
+        add(f"| Coeficiente K do reforço | {r.k_reforco:.1f} |")
+    add("")
+
+    add("## 2. Espessuras de material granular equivalente exigidas")
+    add("")
+    add("Ajuste do ábaco DNER: H = 77,67·N^0,0482·CBR^−0,598 (cm).")
+    add("")
+    add(f"- Sobre o subleito (CBR = {r.cbr_subleito:.0f}%): **Hm = {r.hm_cm:.2f} cm**")
+    add(f"- Sobre a sub-base (CBR = 20%): H20 = {r.h20_cm:.2f} cm")
+    if r.hn_cm is not None:
+        add(f"- Sobre o reforço (CBR = {r.cbr_reforco:.0f}%): Hn = {r.hn_cm:.2f} cm")
+    add("")
+
+    add("## 3. Espessuras adotadas por camada")
+    add("")
+    add("| Camada | Espessura (cm) |")
+    add("|--------|----------------|")
+    add(f"| Revestimento betuminoso R | {r.r_cm:.1f} (mín. DNER {r.r_min_cm:.1f}) |")
+    add(f"| Base B | {r.b_cm:.1f} |")
+    add(f"| Sub-base S | {r.s_cm:.1f} |")
+    if r.reforco_cm is not None:
+        add(f"| Reforço do subleito | {r.reforco_cm:.1f} |")
+    add(f"| **Espessura total** | **{r.espessura_total_cm:.1f}** |")
+    add("")
+
+    add("## 4. Verificação das inequações de equivalência estrutural (DNER)")
+    add("")
+    add("| Inequação | Σ esp.·K (cm) | H exigido (cm) | Atende |")
+    add("|-----------|---------------|----------------|--------|")
+    for ineq in r.inequacoes:
+        icon = "✓" if ineq.atende else "✗"
+        add(f"| {ineq.nome} | {ineq.esquerda_cm:.1f} | "
+            f"{ineq.direita_cm:.1f} | {icon} |")
+    add("")
+
+    linhas += _validation_section(rep, 5)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+def render_earthwork_memorial(r: EarthworkResult, rep: ValidationReport) -> str:
+    """Memorial do balanço de terraplenagem (corte × aterro, áreas médias)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Terraplenagem (Balanço Corte/Aterro)")
+    add("")
+    add(f"**Método:** {r.metodo}  ")
+    add("**Referência:** DNIT, Manual de Implantação Básica de Rodovia")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Volume de corte (banco) | {r.volume_corte_m3:.1f} m³ |")
+    add(f"| Volume de aterro (compactado) | {r.volume_aterro_m3:.1f} m³ |")
+    add(f"| Fator de empolamento Fe | {r.fator_empolamento:.2f} |")
+    add("")
+
+    add("## 2. Balanço de volumes")
+    add("")
+    add(f"- Volume de corte solto (transporte): V_solto = corte·Fe = "
+        f"**{r.volume_corte_solto_m3:.1f} m³**")
+    add(f"- **Balanço = corte − aterro = {r.balanco_m3:.1f} m³** "
+        f"(situação: **{r.situacao}**)")
+    add(f"- Volume de empréstimo (déficit): {r.volume_emprestimo_m3:.1f} m³")
+    add(f"- Volume de bota-fora (excesso): {r.volume_bota_fora_m3:.1f} m³ "
+        f"(solto: {r.volume_bota_fora_solto_m3:.1f} m³)")
+    add("")
+
+    linhas += _validation_section(rep, 3)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+def render_infinite_slope_memorial(
+    r: InfiniteSlopeResult, rep: ValidationReport
+) -> str:
+    """Memorial da estabilidade de talude infinito (FS, Das/NBR 11682)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Estabilidade de Talude Infinito")
+    add("")
+    add(f"**Norma:** {r.norma}  ")
+    add(f"**Método:** {r.metodo}")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Coesão c | {r.c_kpa:.1f} kPa |")
+    add(f"| Ângulo de atrito φ | {r.phi_deg:.1f}° |")
+    add(f"| Peso específico γ | {r.gamma_kn_m3:.1f} kN/m³ |")
+    add(f"| Profundidade da ruptura z | {r.z_m:.2f} m |")
+    add(f"| Inclinação do talude β | {r.beta_deg:.1f}° |")
+    add(f"| Poro-pressão na base u | {r.u_kpa:.1f} kPa |")
+    add("")
+
+    add("## 2. Fator de segurança "
+        "(FS = [c + (γ·z·cos²β − u)·tanφ] / (γ·z·sinβ·cosβ))")
+    add("")
+    add(f"- Tensão resistente (numerador): {r.resisting_kpa:.3f} kPa")
+    add(f"- Tensão atuante (denominador): {r.driving_kpa:.3f} kPa")
+    add(f"- **Fator de segurança: FS = {r.fs:.3f}**")
+    add(f"- Classificação: **{r.classification}** "
+        f"(FS,mín usual ≥ {r.fs_min_usual:.1f}, NBR 11682)")
+    add("")
+
+    linhas += _validation_section(rep, 3)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+def render_fellenius_memorial(r: FelleniusResult, rep: ValidationReport) -> str:
+    """Memorial da estabilidade de talude por Fellenius (fatias, ruptura circular)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Estabilidade de Talude (Fellenius)")
+    add("")
+    add(f"**Norma:** {r.norma}  ")
+    add(f"**Método:** {r.metodo}")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Coesão c | {r.c_kpa:.1f} kPa |")
+    add(f"| Ângulo de atrito φ | {r.phi_deg:.1f}° |")
+    add(f"| Número de fatias | {r.n_slices} |")
+    add("")
+
+    add("## 2. Fator de segurança "
+        "(FS = Σ[c·ΔL + (W·cosα − u·ΔL)·tanφ] / Σ(W·sinα))")
+    add("")
+    add(f"- Σ resistente (numerador): {r.resisting_kn_m:.3f} kN/m")
+    add(f"- Σ atuante (denominador): {r.driving_kn_m:.3f} kN/m")
+    add(f"- **Fator de segurança: FS = {r.fs:.3f}**")
+    add(f"- Classificação: **{r.classification}** "
+        f"(FS,mín usual ≥ {r.fs_min_usual:.1f}, NBR 11682)")
+    add("")
+
+    linhas += _validation_section(rep, 3)
     linhas += _disclaimer_footer()
     return "\n".join(linhas)
 

@@ -30,15 +30,32 @@ claude
 ## Documentação
 
 Ver pasta `docs/` para arquitetura completa, guias e plano de implementação.
+Destaques:
 
-## Domínios Cobertos
+- [`docs/14-catalogo-calculos.md`](docs/14-catalogo-calculos.md) — catálogo de **todos**
+  os cálculos disponíveis (por domínio, com `solve_*`, ferramenta MCP e norma/método).
+- [`docs/06-fases-implementacao.md`](docs/06-fases-implementacao.md) — plano e estado das fases.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — como adicionar um cálculo (TDD, validação, disclaimer).
 
-- Estruturas (concreto armado, aço, madeira, alvenaria)
-- Geotecnia e fundações
-- Hidráulica e saneamento
-- Pavimentação e infraestrutura
-- Orçamento e planejamento
-- Laudos e perícias
+## Estado: v1.0.0 — Fases 1 a 6 implementadas
+
+As seis fases do plano de implementação estão **concluídas**, com suíte de testes
+(unitária + E2E) verde, `ruff` limpo e `--selftest` do MCP server OK. Domínios cobertos
+nesta versão (lista completa no [catálogo](docs/14-catalogo-calculos.md)):
+
+- **Estrutural — concreto armado:** viga, pilar (2ª ordem), sapata isolada, lajes (1 e 2 direções).
+- **Geotecnia e fundações:** capacidade de carga (Vesic), recalques (elástico e adensamento),
+  empuxos (Rankine e Coulomb), estacas por SPT (Aoki-Velloso × Décourt-Quaresma).
+- **Hidráulica e saneamento:** conduto forçado (Hazen-Williams / Darcy-Weisbach), canal
+  aberto (Manning), perda de carga.
+- **Estruturas metálicas:** barra comprimida, ligação parafusada, solda de filete (NBR 8800).
+- **Pavimentação, terraplenagem e taludes:** pavimento flexível (DNER/DNIT), balanço
+  corte/aterro, estabilidade de taludes (infinito e Fellenius).
+- **Orçamento:** custo direto + BDI (base tipo SINAPI, amostra ilustrativa).
+- **Memória de projeto e documentação:** persistência por projeto e relatório consolidado.
+
+Domínios ainda **não** cobertos (o agente deve abster-se): concreto protendido, madeira,
+alvenaria estrutural, dinâmica/sísmica, entre outros.
 
 ## Licença
 

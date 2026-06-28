@@ -12,6 +12,7 @@ from lib.concrete.beams import design_rectangular_beam
 from lib.concrete.columns import design_rectangular_column
 from lib.concrete.footings import design_square_footing
 from lib.concrete.slabs import design_one_way_slab, design_two_way_slab
+from lib.earthwork.volumes import balanco_corte_aterro
 from lib.geotechnical.bearing_capacity import design_bearing_capacity
 from lib.geotechnical.earth_pressure import (
     coulomb_earth_pressure,
@@ -21,6 +22,11 @@ from lib.geotechnical.piles import SoilLayer, comparar_metodos_estaca
 from lib.geotechnical.settlement import (
     consolidation_settlement,
     elastic_settlement,
+)
+from lib.geotechnical.slope_stability import (
+    Slice,
+    fellenius_fs,
+    infinite_slope_fs,
 )
 from lib.hydraulic.head_loss import total_head_loss
 from lib.hydraulic.open_channel import (
@@ -32,6 +38,7 @@ from lib.hydraulic.pipe_flow import (
     pipe_flow_darcy_weisbach,
     pipe_flow_hazen_williams,
 )
+from lib.pavement.flexible import design_flexible_pavement
 from lib.reporting.disclaimer import DISCLAIMER
 from lib.reporting.memorial import (
     render_bearing_capacity_memorial,
@@ -41,11 +48,15 @@ from lib.reporting.memorial import (
     render_compression_memorial,
     render_consolidation_settlement_memorial,
     render_earth_pressure_memorial,
+    render_earthwork_memorial,
     render_elastic_settlement_memorial,
+    render_fellenius_memorial,
     render_footing_memorial,
     render_head_loss_memorial,
+    render_infinite_slope_memorial,
     render_open_channel_memorial,
     render_orcamento_memorial,
+    render_pavement_memorial,
     render_pile_comparison_memorial,
     render_pipe_flow_memorial,
     render_slab_memorial,
@@ -61,12 +72,15 @@ from lib.validators.geotech_check import (
     validate_pile,
     validate_settlement,
 )
+from lib.validators.earthwork_check import validate_earthwork
 from lib.validators.hydraulic_check import (
     validate_head_loss,
     validate_open_channel,
     validate_pipe_flow,
 )
+from lib.validators.pavement_check import validate_pavement
 from lib.validators.report import Check, ValidationReport
+from lib.validators.slope_check import validate_slope
 from lib.validators.steel_check import validate_compression
 from lib.validators.steel_connections_check import validate_bolted, validate_weld
 from lib.validators.validate import (
@@ -480,4 +494,92 @@ def solve_weld(
     )
     rep = validate_weld(r)
     memorial = render_weld_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+# =========================================== PAVIMENTO / TERRAPLENAGEM / TALUDES
+
+
+def solve_flexible_pavement(
+    cbr_subleito: float,
+    n_trafego: float,
+    cbr_reforco: float | None = None,
+    k_rev: float = 2.0,
+    k_base: float = 1.0,
+    k_subbase: float = 1.0,
+    k_reforco: float = 1.0,
+    r_cm: float | None = None,
+) -> dict:
+    """Dimensiona um pavimento flexível (método empírico DNER/DNIT) — pacote completo.
+
+    ``n_trafego`` é o número N. ``cbr_reforco`` ativa a camada de reforço. Abstém-se
+    (``ValueError``) para CBR fora de [2, 20]% ou N fora de [1e4, 1e8].
+    """
+    r = design_flexible_pavement(
+        cbr_subleito=cbr_subleito, n_trafego=n_trafego, cbr_reforco=cbr_reforco,
+        k_rev=k_rev, k_base=k_base, k_subbase=k_subbase, k_reforco=k_reforco,
+        r_cm=r_cm,
+    )
+    rep = validate_pavement(r)
+    memorial = render_pavement_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_earthwork(
+    volume_corte_m3: float,
+    volume_aterro_m3: float,
+    fator_empolamento: float = 1.0,
+) -> dict:
+    """Resolve o balanço de terraplenagem (corte × aterro) — pacote completo.
+
+    ``balanco = corte − aterro`` (+ excesso/bota-fora, − déficit/empréstimo).
+    ``fator_empolamento`` em [1,0; 1,5] reporta o volume solto. Abstém-se
+    (``ValueError``) para volumes negativos ou Fe fora da faixa.
+    """
+    r = balanco_corte_aterro(
+        volume_corte_m3=volume_corte_m3, volume_aterro_m3=volume_aterro_m3,
+        fator_empolamento=fator_empolamento,
+    )
+    rep = validate_earthwork(r)
+    memorial = render_earthwork_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_infinite_slope(
+    c_kpa: float,
+    phi_deg: float,
+    gamma_kn_m3: float,
+    z_m: float,
+    beta_deg: float,
+    u_kpa: float = 0.0,
+) -> dict:
+    """Resolve a estabilidade de talude infinito (FS) — pacote completo.
+
+    FS = [c + (γ·z·cos²β − u)·tanφ] / (γ·z·sinβ·cosβ). Entradas fora de faixa
+    física levantam ``ValueError`` (abstenção).
+    """
+    r = infinite_slope_fs(
+        c_kpa=c_kpa, phi_deg=phi_deg, gamma_kn_m3=gamma_kn_m3, z_m=z_m,
+        beta_deg=beta_deg, u_kpa=u_kpa,
+    )
+    rep = validate_slope(r)
+    memorial = render_infinite_slope_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_fellenius(
+    slices: list[dict | Slice],
+    c_kpa: float,
+    phi_deg: float,
+) -> dict:
+    """Resolve a estabilidade de talude por Fellenius (fatias) — pacote completo.
+
+    ``slices`` aceita ``Slice`` ou ``dict`` ``{w_kn, alpha_deg, dl_m, u_kpa?}``.
+    FS = Σ[c·ΔL + (W·cosα − u·ΔL)·tanφ] / Σ(W·sinα). Entradas inválidas levantam
+    ``ValueError`` (abstenção).
+    """
+    parsed = [s if isinstance(s, Slice) else Slice(**s) for s in slices]
+    r = fellenius_fs(parsed, c_kpa=c_kpa, phi_deg=phi_deg)
+    rep = validate_slope(r)
+    memorial = render_fellenius_memorial(r, rep)
     return _bundle(r, rep, memorial)

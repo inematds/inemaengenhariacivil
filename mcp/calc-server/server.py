@@ -39,8 +39,12 @@ from lib.service import (  # noqa: E402
     solve_consolidation_settlement,
     solve_earth_pressure_coulomb,
     solve_earth_pressure_rankine,
+    solve_earthwork,
     solve_elastic_settlement,
+    solve_fellenius,
+    solve_flexible_pavement,
     solve_head_loss,
+    solve_infinite_slope,
     solve_one_way_slab,
     solve_open_channel,
     solve_orcamento,
@@ -481,6 +485,92 @@ def solda_filete(
     return solve_weld(forca_kn=forca_kn, perna_mm=perna_mm, fw_mpa=fw_mpa, gamma_a2=gamma_a2)
 
 
+# ================================== PAVIMENTO / TERRAPLENAGEM / TALUDES
+
+
+@mcp.tool()
+def dimensionar_pavimento_flexivel(
+    cbr_subleito: float,
+    n_trafego: float,
+    cbr_reforco: float | None = None,
+    k_rev: float = 2.0,
+    k_base: float = 1.0,
+    k_subbase: float = 1.0,
+    k_reforco: float = 1.0,
+    r_cm: float | None = None,
+) -> dict:
+    """Dimensiona pavimento flexível pelo método empírico do DNER/DNIT (CBR / número N).
+
+    ``n_trafego`` é o número N de solicitações do eixo padrão. ``cbr_reforco`` ativa a
+    camada de reforço do subleito (opcional). ``r_cm`` fixa o revestimento (senão usa o
+    mínimo DNER). Válido para CBR ∈ [2, 20]% e N ∈ [1e4, 1e8] — fora disso abstém-se.
+    NÃO trata pavimento rígido nem método mecanístico-empírico. Devolve as espessuras
+    por camada, a verificação das inequações, validação, memorial e o aviso obrigatório.
+    """
+    return solve_flexible_pavement(
+        cbr_subleito=cbr_subleito, n_trafego=n_trafego, cbr_reforco=cbr_reforco,
+        k_rev=k_rev, k_base=k_base, k_subbase=k_subbase, k_reforco=k_reforco, r_cm=r_cm,
+    )
+
+
+@mcp.tool()
+def terraplenagem_balanco(
+    volume_corte_m3: float,
+    volume_aterro_m3: float,
+    fator_empolamento: float = 1.0,
+) -> dict:
+    """Balanço de terraplenagem corte × aterro (volumes geométricos, áreas médias).
+
+    ``balanco = corte − aterro``: positivo => excesso (bota-fora); negativo => déficit
+    (empréstimo). ``fator_empolamento`` ∈ [1,0; 1,5] reporta o volume solto a
+    transportar. Volumes negativos ou Fe fora da faixa => erro (o agente deve abster-se).
+    Devolve volumes derivados, situação, validação, memorial e o aviso obrigatório.
+    """
+    return solve_earthwork(
+        volume_corte_m3=volume_corte_m3, volume_aterro_m3=volume_aterro_m3,
+        fator_empolamento=fator_empolamento,
+    )
+
+
+@mcp.tool()
+def talude_infinito(
+    c_kpa: float,
+    phi_deg: float,
+    gamma_kn_m3: float,
+    z_m: float,
+    beta_deg: float,
+    u_kpa: float = 0.0,
+) -> dict:
+    """Fator de segurança de talude infinito (ruptura plana paralela à face).
+
+    FS = [c + (γ·z·cos²β − u)·tanφ] / (γ·z·sinβ·cosβ). ``u`` é a poro-pressão na base
+    (informe o valor calculado para percolação). Faixas físicas: φ∈[0,50]°,
+    γ∈[10,25] kN/m³, β∈(0,90)°, c≥0, z>0 — fora delas abstém-se. FS,mín usual ≥ 1,5
+    (NBR 11682). Devolve FS, classificação, validação, memorial e o aviso obrigatório.
+    """
+    return solve_infinite_slope(
+        c_kpa=c_kpa, phi_deg=phi_deg, gamma_kn_m3=gamma_kn_m3, z_m=z_m,
+        beta_deg=beta_deg, u_kpa=u_kpa,
+    )
+
+
+@mcp.tool()
+def talude_fellenius(
+    slices: list[dict],
+    c_kpa: float,
+    phi_deg: float,
+) -> dict:
+    """Estabilidade de talude por Fellenius (método ordinário das fatias, circular).
+
+    ``slices`` é a lista de fatias ``{"w_kn": float, "alpha_deg": float, "dl_m": float,
+    "u_kpa": float?}`` (W = peso por metro de talude; α = ângulo da base; ΔL = comprimento
+    da base; u = poro-pressão). FS = Σ[c·ΔL + (W·cosα − u·ΔL)·tanφ] / Σ(W·sinα). Conservador
+    frente a Bishop simplificado (FORA DE ESCOPO — exige iteração). Lista vazia, ΔL≤0 ou W≤0
+    => erro (abster-se). Devolve FS, classificação, validação, memorial e o aviso obrigatório.
+    """
+    return solve_fellenius(slices=slices, c_kpa=c_kpa, phi_deg=phi_deg)
+
+
 # ============================================================== NORMAS (consulta)
 
 
@@ -640,6 +730,10 @@ def listar_capacidades() -> dict:
             "escoamento_conduto — conduto forçado, Hazen-Williams ou Darcy-Weisbach",
             "canal_aberto_manning — escoamento uniforme em canal aberto (Manning)",
             "perda_de_carga — perda distribuída + localizadas (coeficientes K)",
+            "dimensionar_pavimento_flexivel — pavimento flexível, método empírico (DNER/DNIT)",
+            "terraplenagem_balanco — balanço corte/aterro, empolamento (DNIT, áreas médias)",
+            "talude_infinito — FS de talude infinito (Das / NBR 11682)",
+            "talude_fellenius — FS de talude por Fellenius, fatias circulares (NBR 11682)",
             "montar_orcamento — orçamento custo direto + BDI, base tipo SINAPI (amostra)",
             "consultar_preco_sinapi — preço unitário de um código na base SINAPI (amostra)",
             "combinar_acoes_elu — combinação última normal de ações (NBR 8681/6118)",
@@ -695,7 +789,11 @@ def _selftest() -> int:
         bdi_pct=25.0,
         csv_path=str(_ROOT / "data" / "sinapi_amostra.csv"),
     )
-    bundles = [viga, pilar, sapata, fundacao, aco, conduto, orcamento]
+    # estabilidade de taludes: talude infinito (Das / NBR 11682)
+    talude = solve_infinite_slope(
+        c_kpa=10.0, phi_deg=25.0, gamma_kn_m3=18.0, z_m=3.0, beta_deg=20.0,
+    )
+    bundles = [viga, pilar, sapata, fundacao, aco, conduto, orcamento, talude]
     ok = all(b["aprovado"] and "6.496/77" in b["aviso"] for b in bundles)
     print("SELFTEST OK" if ok else "SELFTEST FAIL")
     return 0 if ok else 1
