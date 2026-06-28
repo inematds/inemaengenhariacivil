@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "norma": "NBR 8800:2008",
+    "tipo": "Perfis laminados W (abas paralelas)",
+    "fonte": "Catálogo Gerdau Açominas — Perfis Estruturais (bitolas W)",
+    "unidades": {
+      "d_mm": "mm", "bf_mm": "mm", "tw_mm": "mm", "tf_mm": "mm",
+      "area_cm2": "cm^2", "ix_cm4": "cm^4", "iy_cm4": "cm^4",
+      "wx_cm3": "cm^3", "wy_cm3": "cm^3", "zx_cm3": "cm^3",
+      "rx_cm": "cm", "ry_cm": "cm", "massa_kg_m": "kg/m"
+    },
+    "consistencia": "rx = sqrt(Ix/A) e ry = sqrt(Iy/A) verificadas em tests/unit/test_steel_profiles.py"
+  },
+  "perfis": {
+    "W150x13,0": {
+      "d_mm": 148, "bf_mm": 100, "tw_mm": 4.3, "tf_mm": 4.9,
+      "area_cm2": 16.6, "ix_cm4": 635, "iy_cm4": 82.0,
+      "wx_cm3": 85.8, "wy_cm3": 16.4, "zx_cm3": 96.5,
+      "rx_cm": 6.18, "ry_cm": 2.22, "massa_kg_m": 13.0
+    },
+    "W200x15,0": {
+      "d_mm": 200, "bf_mm": 100, "tw_mm": 4.3, "tf_mm": 5.2,
+      "area_cm2": 19.4, "ix_cm4": 1305, "iy_cm4": 87.0,
+      "wx_cm3": 130, "wy_cm3": 17.4, "zx_cm3": 147,
+      "rx_cm": 8.20, "ry_cm": 2.12, "massa_kg_m": 15.0
+    },
+    "W200x19,3": {
+      "d_mm": 203, "bf_mm": 102, "tw_mm": 5.8, "tf_mm": 6.5,
+      "area_cm2": 25.1, "ix_cm4": 1686, "iy_cm4": 115,
+      "wx_cm3": 166, "wy_cm3": 22.6, "zx_cm3": 190,
+      "rx_cm": 8.20, "ry_cm": 2.14, "massa_kg_m": 19.3
+    },
+    "W200x22,5": {
+      "d_mm": 206, "bf_mm": 102, "tw_mm": 6.2, "tf_mm": 8.0,
+      "area_cm2": 29.0, "ix_cm4": 2029, "iy_cm4": 142,
+      "wx_cm3": 197, "wy_cm3": 27.9, "zx_cm3": 221,
+      "rx_cm": 8.37, "ry_cm": 2.22, "massa_kg_m": 22.5
+    },
+    "W250x17,9": {
+      "d_mm": 251, "bf_mm": 101, "tw_mm": 4.8, "tf_mm": 5.3,
+      "area_cm2": 23.1, "ix_cm4": 2291, "iy_cm4": 91.0,
+      "wx_cm3": 183, "wy_cm3": 18.1, "zx_cm3": 211,
+      "rx_cm": 9.96, "ry_cm": 1.99, "massa_kg_m": 17.9
+    },
+    "W250x22,3": {
+      "d_mm": 254, "bf_mm": 102, "tw_mm": 5.8, "tf_mm": 6.9,
+      "area_cm2": 28.4, "ix_cm4": 2939, "iy_cm4": 122,
+      "wx_cm3": 231, "wy_cm3": 24.0, "zx_cm3": 267,
+      "rx_cm": 10.2, "ry_cm": 2.07, "massa_kg_m": 22.3
+    },
+    "W250x25,3": {
+      "d_mm": 257, "bf_mm": 102, "tw_mm": 6.1, "tf_mm": 8.4,
+      "area_cm2": 32.2, "ix_cm4": 3473, "iy_cm4": 149,
+      "wx_cm3": 270, "wy_cm3": 29.3, "zx_cm3": 307,
+      "rx_cm": 10.4, "ry_cm": 2.15, "massa_kg_m": 25.3
+    },
+    "W310x21,0": {
+      "d_mm": 303, "bf_mm": 101, "tw_mm": 5.1, "tf_mm": 5.7,
+      "area_cm2": 27.2, "ix_cm4": 3776, "iy_cm4": 98.0,
+      "wx_cm3": 249, "wy_cm3": 19.5, "zx_cm3": 289,
+      "rx_cm": 11.8, "ry_cm": 1.90, "massa_kg_m": 21.0
+    },
+    "W310x28,3": {
+      "d_mm": 309, "bf_mm": 102, "tw_mm": 6.0, "tf_mm": 8.9,
+      "area_cm2": 36.5, "ix_cm4": 5500, "iy_cm4": 158,
+      "wx_cm3": 356, "wy_cm3": 31.0, "zx_cm3": 402,
+      "rx_cm": 12.3, "ry_cm": 2.08, "massa_kg_m": 28.3
+    },
+    "W310x32,7": {
+      "d_mm": 310, "bf_mm": 102, "tw_mm": 6.6, "tf_mm": 10.8,
+      "area_cm2": 41.7, "ix_cm4": 6570, "iy_cm4": 192,
+      "wx_cm3": 424, "wy_cm3": 37.6, "zx_cm3": 481,
+      "rx_cm": 12.5, "ry_cm": 2.15, "massa_kg_m": 32.7
+    },
+    "W360x32,9": {
+      "d_mm": 349, "bf_mm": 127, "tw_mm": 5.8, "tf_mm": 8.5,
+      "area_cm2": 42.1, "ix_cm4": 8358, "iy_cm4": 291,
+      "wx_cm3": 479, "wy_cm3": 45.9, "zx_cm3": 547,
+      "rx_cm": 14.1, "ry_cm": 2.63, "massa_kg_m": 32.9
+    },
+    "W360x39,0": {
+      "d_mm": 353, "bf_mm": 128, "tw_mm": 6.5, "tf_mm": 10.7,
+      "area_cm2": 50.2, "ix_cm4": 10330, "iy_cm4": 375,
+      "wx_cm3": 585, "wy_cm3": 58.6, "zx_cm3": 663,
+      "rx_cm": 14.3, "ry_cm": 2.73, "massa_kg_m": 39.0
+    },
+    "W410x38,8": {
+      "d_mm": 399, "bf_mm": 140, "tw_mm": 6.4, "tf_mm": 8.8,
+      "area_cm2": 50.3, "ix_cm4": 12780, "iy_cm4": 403,
+      "wx_cm3": 640, "wy_cm3": 57.6, "zx_cm3": 736,
+      "rx_cm": 15.9, "ry_cm": 2.83, "massa_kg_m": 38.8
+    },
+    "W410x46,1": {
+      "d_mm": 403, "bf_mm": 140, "tw_mm": 7.0, "tf_mm": 11.2,
+      "area_cm2": 59.2, "ix_cm4": 15690, "iy_cm4": 514,
+      "wx_cm3": 778, "wy_cm3": 73.4, "zx_cm3": 886,
+      "rx_cm": 16.3, "ry_cm": 2.95, "massa_kg_m": 46.1
+    }
+  }
+}

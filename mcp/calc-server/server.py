@@ -21,6 +21,8 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_ROOT))
 
 from lib.budget.sinapi import load_sinapi, lookup  # noqa: E402
+from lib.math.interpolation import linear_interp  # noqa: E402
+from lib.norms.search import buscar_tabela  # noqa: E402
 from lib.projects.store import (  # noqa: E402
     ProjectRecord,
     add_calculo,
@@ -32,6 +34,8 @@ from lib.reporting.disclaimer import DISCLAIMER  # noqa: E402
 from lib.reporting.report import build_project_report  # noqa: E402
 from lib.service import (  # noqa: E402
     solve_bearing_capacity,
+    solve_bolted_connection,
+    solve_compression,
     solve_consolidation_settlement,
     solve_earth_pressure_coulomb,
     solve_earth_pressure_rankine,
@@ -46,7 +50,9 @@ from lib.service import (  # noqa: E402
     solve_rectangular_column,
     solve_square_footing,
     solve_two_way_slab,
+    solve_weld,
 )
+from lib.steel.profiles import get_profile, load_profiles  # noqa: E402
 from lib.structural.combinations import combinar_elu_normal  # noqa: E402
 from lib.structural.loads import (  # noqa: E402
     carga_acidental_uso,
@@ -395,6 +401,114 @@ def perda_de_carga(
     )
 
 
+# ============================================================== METÁLICAS (NBR 8800)
+
+
+@mcp.tool()
+def dimensionar_compressao_aco(
+    designacao: str,
+    kl_cm: float,
+    fy_mpa: float = 250.0,
+    e_mpa: float = 200000.0,
+    q: float = 1.0,
+    gamma_a1: float = 1.1,
+) -> dict:
+    """Dimensiona barra comprimida de aço à flambagem por flexão (NBR 8800:2008 §5.3).
+
+    ``designacao`` é um perfil W do catálogo (ver ``consultar_perfil_w``). ``kl_cm`` é o
+    comprimento de flambagem (KL); a flambagem governa no eixo de menor inércia (Iy).
+    Hipótese: ``Q = 1`` (seção compacta, sem flambagem local) — se houver flambagem
+    local (Q≠1), FLT, ou outro estado-limite, abstenha-se. Perfil inexistente => erro
+    listando os disponíveis. Devolve Nc,Rd, validação, memorial e o aviso obrigatório.
+    """
+    return solve_compression(
+        designacao=designacao, kl_cm=kl_cm, fy_mpa=fy_mpa, e_mpa=e_mpa,
+        q=q, gamma_a1=gamma_a1,
+    )
+
+
+@mcp.tool()
+def consultar_perfil_w(designacao: str) -> dict:
+    """Consulta as propriedades geométricas de um perfil laminado W (catálogo NBR 8800).
+
+    Devolve d, bf, tw, tf, área, inércias (Ix/Iy), módulos (Wx/Wy/Zx), raios (rx/ry) e
+    massa linear. Perfil inexistente => erro listando os disponíveis (o agente deve
+    abster-se em vez de inventar propriedades).
+    """
+    prof = get_profile(designacao, load_profiles())
+    return {"resultado": prof.model_dump(), "aviso": DISCLAIMER}
+
+
+@mcp.tool()
+def ligacao_parafusada(
+    forca_kn: float,
+    db_mm: float,
+    fub_mpa: float,
+    t_mm: float,
+    fu_mpa: float,
+    planos: int = 1,
+    rosca_no_plano: bool = True,
+    gamma_a2: float = 1.35,
+) -> dict:
+    """Dimensiona uma ligação parafusada solicitada ao cortante (NBR 8800:2008 §6.3).
+
+    Calcula a resistência por parafuso como o mínimo entre cortante (§6.3.3.2) e pressão
+    de contato (§6.3.3.3, limite 2,4·db·t·fu/γa2) e adota n = ⌈força/Rd⌉.
+    ``rosca_no_plano=True`` usa coef. 0,4 (rosca no plano de corte); ``False`` usa 0,5.
+    Hipótese: espaçamentos/distâncias às bordas mínimos atendidos — confirmar no
+    detalhamento. Devolve resistências, nº de parafusos, validação, memorial e o aviso.
+    """
+    return solve_bolted_connection(
+        forca_kn=forca_kn, db_mm=db_mm, fub_mpa=fub_mpa, t_mm=t_mm, fu_mpa=fu_mpa,
+        planos=planos, rosca_no_plano=rosca_no_plano, gamma_a2=gamma_a2,
+    )
+
+
+@mcp.tool()
+def solda_filete(
+    forca_kn: float,
+    perna_mm: float,
+    fw_mpa: float = 485.0,
+    gamma_a2: float = 1.35,
+) -> dict:
+    """Dimensiona o comprimento de solda de filete para uma força (NBR 8800:2008 §6.2.6).
+
+    Rd = 0,6·fw·aw/γa2, com garganta aw = 0,7·perna; ``fw`` é a resistência do metal da
+    solda (eletrodo E70 => 485 MPa). Considera o metal da solda governante e esforço
+    paralelo ao eixo do filete. Devolve a resistência por cm, o comprimento necessário,
+    a validação, o memorial e o aviso de responsabilidade técnica.
+    """
+    return solve_weld(forca_kn=forca_kn, perna_mm=perna_mm, fw_mpa=fw_mpa, gamma_a2=gamma_a2)
+
+
+# ============================================================== NORMAS (consulta)
+
+
+@mcp.tool()
+def consultar_tabela_norma(termo: str, base_dir: str = "normas") -> dict:
+    """Busca LÉXICA por ``termo`` nas tabelas normativas (``normas/<NORMA>/tables/*.json``).
+
+    Casamento por substring, sem acento e case-insensitive — NÃO usa embeddings/semântica.
+    Devolve SÓ o que está tabelado (chave + dados de cada entrada que casa); termo sem
+    correspondência => lista vazia (o agente deve abster-se, nunca inventar valor de norma).
+    """
+    base = base_dir if pathlib.Path(base_dir).is_absolute() else str(_ROOT / base_dir)
+    resultados = buscar_tabela(termo, base_dir=base)
+    return {"termo": termo, "resultados": resultados, "n": len(resultados), "aviso": DISCLAIMER}
+
+
+@mcp.tool()
+def interpolar_tabela(x: float, xs: list[float], ys: list[float]) -> dict:
+    """Interpolação LINEAR de y(x) numa tabela 1D (NBR — coeficientes tabelados).
+
+    ``xs`` deve ser estritamente crescente e ``ys`` ter o mesmo comprimento. Sem
+    extrapolação: ``x`` fora de ``[xs[0], xs[-1]]`` => erro (princípio da abstenção). Use
+    sobre valores obtidos de ``consultar_tabela_norma`` — não invente os nós da tabela.
+    """
+    y = linear_interp(x, xs, ys)
+    return {"resultado": {"x": x, "y": y}, "aviso": DISCLAIMER}
+
+
 # ============================================================== ORÇAMENTO
 
 
@@ -517,6 +631,12 @@ def listar_capacidades() -> dict:
             "empuxo_rankine — empuxo de terra de Rankine (contenção)",
             "empuxo_coulomb — empuxo de terra de Coulomb com δ/β/α (contenção)",
             "capacidade_estaca — estaca por SPT, Aoki-Velloso × Décourt-Quaresma (NBR 6122)",
+            "dimensionar_compressao_aco — barra comprimida, flambagem por flexão (NBR 8800:2008)",
+            "consultar_perfil_w — propriedades geométricas de perfil laminado W (NBR 8800)",
+            "ligacao_parafusada — ligação parafusada à cortante, nº de parafusos (NBR 8800 §6.3)",
+            "solda_filete — comprimento de solda de filete (NBR 8800 §6.2.6)",
+            "consultar_tabela_norma — busca léxica nas tabelas das normas (só o tabelado)",
+            "interpolar_tabela — interpolação linear de coeficientes tabelados (sem extrapolar)",
             "escoamento_conduto — conduto forçado, Hazen-Williams ou Darcy-Weisbach",
             "canal_aberto_manning — escoamento uniforme em canal aberto (Manning)",
             "perda_de_carga — perda distribuída + localizadas (coeficientes K)",
@@ -559,6 +679,8 @@ def _selftest() -> int:
     fundacao = solve_bearing_capacity(
         c_kpa=10.0, phi_deg=30.0, gamma_kn_m3=18.0, b_m=2.0, depth_df_m=1.5,
     )
+    # metálicas: barra comprimida de aço (NBR 8800 §5.3)
+    aco = solve_compression(designacao="W250x22,3", kl_cm=300.0, fy_mpa=250.0)
     # hidráulica: conduto forçado por Hazen-Williams
     conduto = solve_pipe_flow(
         Q_m3s=0.05, D_m=0.30, L_m=1000.0, metodo="hazen-williams", C=130.0,
@@ -573,7 +695,7 @@ def _selftest() -> int:
         bdi_pct=25.0,
         csv_path=str(_ROOT / "data" / "sinapi_amostra.csv"),
     )
-    bundles = [viga, pilar, sapata, fundacao, conduto, orcamento]
+    bundles = [viga, pilar, sapata, fundacao, aco, conduto, orcamento]
     ok = all(b["aprovado"] and "6.496/77" in b["aviso"] for b in bundles)
     print("SELFTEST OK" if ok else "SELFTEST FAIL")
     return 0 if ok else 1

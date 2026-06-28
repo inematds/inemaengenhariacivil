@@ -1,6 +1,6 @@
 [project]
 name = "inema-engenharia-civil"
-version = "0.4.0"
+version = "0.5.0"
 description = "Plataforma de agentes de IA para cálculos de engenharia civil"
 requires-python = ">=3.11"
 dependencies = [

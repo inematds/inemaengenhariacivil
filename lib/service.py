@@ -36,7 +36,9 @@ from lib.reporting.disclaimer import DISCLAIMER
 from lib.reporting.memorial import (
     render_bearing_capacity_memorial,
     render_beam_memorial,
+    render_bolted_memorial,
     render_column_memorial,
+    render_compression_memorial,
     render_consolidation_settlement_memorial,
     render_earth_pressure_memorial,
     render_elastic_settlement_memorial,
@@ -47,7 +49,11 @@ from lib.reporting.memorial import (
     render_pile_comparison_memorial,
     render_pipe_flow_memorial,
     render_slab_memorial,
+    render_weld_memorial,
 )
+from lib.steel.connections import design_bolted_connection, design_fillet_weld
+from lib.steel.profiles import DEFAULT_TABLE, load_profiles
+from lib.steel.stability import design_compression
 from lib.validators.budget_check import validate_orcamento
 from lib.validators.geotech_check import (
     validate_bearing,
@@ -61,6 +67,8 @@ from lib.validators.hydraulic_check import (
     validate_pipe_flow,
 )
 from lib.validators.report import Check, ValidationReport
+from lib.validators.steel_check import validate_compression
+from lib.validators.steel_connections_check import validate_bolted, validate_weld
 from lib.validators.validate import (
     validate_beam,
     validate_column,
@@ -409,4 +417,67 @@ def solve_orcamento(
     r = montar_orcamento(itens, base, bdi_pct=bdi_pct)
     rep = validate_orcamento(r)
     memorial = render_orcamento_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+# ====================================================================== METÁLICAS
+
+
+def solve_compression(
+    designacao: str,
+    kl_cm: float,
+    fy_mpa: float = 250.0,
+    e_mpa: float = 200000.0,
+    q: float = 1.0,
+    gamma_a1: float = 1.1,
+    json_path: str | None = None,
+) -> dict:
+    """Resolve uma barra comprimida de aço (NBR 8800 §5.3) — pacote completo.
+
+    Carrega a tabela de perfis W (``DEFAULT_TABLE`` por padrão), dimensiona à flambagem
+    por flexão, valida e gera o memorial. Abstenção: perfil inexistente propaga
+    ``KeyError`` (de :func:`lib.steel.profiles.get_profile`).
+    """
+    base = load_profiles(json_path if json_path is not None else DEFAULT_TABLE)
+    r = design_compression(
+        designacao=designacao, base=base, kl_cm=kl_cm,
+        fy_mpa=fy_mpa, e_mpa=e_mpa, q=q, gamma_a1=gamma_a1,
+    )
+    rep = validate_compression(r)
+    memorial = render_compression_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_bolted_connection(
+    forca_kn: float,
+    db_mm: float,
+    fub_mpa: float,
+    t_mm: float,
+    fu_mpa: float,
+    planos: int = 1,
+    rosca_no_plano: bool = True,
+    gamma_a2: float = 1.35,
+) -> dict:
+    """Resolve uma ligação parafusada à cortante (NBR 8800 §6.3) — pacote completo."""
+    r = design_bolted_connection(
+        forca_kn=forca_kn, db_mm=db_mm, fub_mpa=fub_mpa, t_mm=t_mm, fu_mpa=fu_mpa,
+        planos=planos, rosca_no_plano=rosca_no_plano, gamma_a2=gamma_a2,
+    )
+    rep = validate_bolted(r)
+    memorial = render_bolted_memorial(r, rep)
+    return _bundle(r, rep, memorial)
+
+
+def solve_weld(
+    forca_kn: float,
+    perna_mm: float,
+    fw_mpa: float = 485.0,
+    gamma_a2: float = 1.35,
+) -> dict:
+    """Resolve uma solda de filete (NBR 8800 §6.2.6) — pacote completo."""
+    r = design_fillet_weld(
+        forca_kn=forca_kn, perna_mm=perna_mm, fw_mpa=fw_mpa, gamma_a2=gamma_a2,
+    )
+    rep = validate_weld(r)
+    memorial = render_weld_memorial(r, rep)
     return _bundle(r, rep, memorial)

@@ -21,6 +21,8 @@ from lib.hydraulic.head_loss import HeadLossResult
 from lib.hydraulic.open_channel import OpenChannelResult
 from lib.hydraulic.pipe_flow import PipeFlowResult
 from lib.reporting.disclaimer import DISCLAIMER
+from lib.steel.connections import BoltedConnectionResult, WeldResult
+from lib.steel.stability import CompressionResult
 from lib.validators.report import ValidationReport
 
 _STATUS_ICON = {"ok": "✓", "warning": "⚠", "fail": "✗"}
@@ -644,6 +646,133 @@ def render_head_loss_memorial(r: HeadLossResult, rep: ValidationReport) -> str:
     add(f"- Perda distribuída: hf,dist = {r.hf_distribuida_m:.3f} m")
     add(f"- Perda localizada total: hf,loc = {r.hf_localizada_m:.3f} m")
     add(f"- **Perda de carga total: hf,total = {r.hf_total_m:.3f} m**")
+    add("")
+
+    linhas += _validation_section(rep, 4)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+# ====================================================================== METÁLICAS
+
+
+def render_compression_memorial(r: CompressionResult, rep: ValidationReport) -> str:
+    """Memorial da barra comprimida de aço (flambagem por flexão, NBR 8800:2008 §5.3)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Barra Comprimida de Aço (flambagem por flexão)")
+    add("")
+    add(f"**Norma:** {r.norma}  ")
+    add("**Elemento:** Perfil laminado comprimido — flambagem global por flexão (ELU)")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Perfil | {r.designacao} |")
+    add(f"| Comprimento de flambagem KL | {r.kl_cm:.0f} cm |")
+    add(f"| Resistência ao escoamento fy | {r.fy_mpa:.0f} MPa |")
+    add(f"| Módulo de elasticidade E | {r.e_mpa:.0f} MPa |")
+    add(f"| Coeficiente de flambagem local Q | {r.q:.2f} |")
+    add(f"| Área da seção A | {r.area_cm2:.2f} cm² |")
+    add(f"| Inércia no eixo de flambagem Iy | {r.i_cm4:.1f} cm⁴ |")
+    add("")
+
+    add("## 2. Flambagem elástica e esbeltez reduzida")
+    add("")
+    add(f"- Carga de flambagem de Euler: Ne = π²·E·Iy/(KL)² = {r.ne_kn:.2f} kN")
+    add(f"- Esbeltez reduzida: λ0 = √(Q·A·fy/Ne) = {r.lambda_0:.4f}")
+    add(f"- Fator de redução por flambagem: χ = {r.chi:.4f}")
+    add("")
+
+    add("## 3. Força axial resistente de cálculo")
+    add("")
+    add(f"- Coeficiente de ponderação: γa1 = {r.gamma_a1:.2f}")
+    add(f"- **Nc,Rd = χ·Q·A·fy/γa1 = {r.nc_rd_kn:.2f} kN**")
+    add("")
+
+    linhas += _validation_section(rep, 4)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+def render_bolted_memorial(r: BoltedConnectionResult, rep: ValidationReport) -> str:
+    """Memorial da ligação parafusada à cortante (NBR 8800:2008 §6.3)."""
+    plano = "rosqueada" if r.rosca_no_plano else "fuste (não rosqueada)"
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Ligação Parafusada (cortante)")
+    add("")
+    add(f"**Norma:** {r.norma}  ")
+    add("**Elemento:** Ligação por parafusos solicitada ao cortante (ELU)")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Força solicitante de cálculo | {r.forca_kn:.2f} kN |")
+    add(f"| Diâmetro do parafuso db | {r.db_mm:g} mm |")
+    add(f"| Resistência à ruptura do parafuso fub | {r.fub_mpa:.0f} MPa |")
+    add(f"| Espessura da chapa t | {r.t_mm:g} mm |")
+    add(f"| Resistência à ruptura da chapa fu | {r.fu_mpa:.0f} MPa |")
+    add(f"| Número de planos de corte | {r.planos} |")
+    add(f"| Plano de corte na parte | {plano} |")
+    add(f"| Coeficiente de ponderação γa2 | {r.gamma_a2:.2f} |")
+    add("")
+
+    add("## 2. Resistência por parafuso")
+    add("")
+    add(f"- Área bruta do parafuso: Ab = π·db²/4 = {r.ab_cm2:.3f} cm²")
+    add(f"- Cortante (§6.3.3.2): Fv,Rd = {r.fv_rd_kn:.2f} kN")
+    add(f"- Pressão de contato (§6.3.3.3, 2,4·db·t·fu/γa2): Fc,Rd = {r.fc_rd_kn:.2f} kN")
+    add(f"- **Resistência governante: Rd = {r.rd_bolt_kn:.2f} kN ({r.governante})**")
+    add("")
+
+    add("## 3. Número de parafusos")
+    add("")
+    add(f"- n = ⌈força/Rd⌉ = **{r.n_parafusos}** parafuso(s)")
+    add(f"- **Capacidade total da ligação: n·Rd = {r.capacidade_total_kn:.2f} kN**")
+    add("")
+
+    linhas += _validation_section(rep, 4)
+    linhas += _disclaimer_footer()
+    return "\n".join(linhas)
+
+
+def render_weld_memorial(r: WeldResult, rep: ValidationReport) -> str:
+    """Memorial da solda de filete (NBR 8800:2008 §6.2.6)."""
+    linhas: list[str] = []
+    add = linhas.append
+
+    add("# Memorial de Cálculo — Solda de Filete")
+    add("")
+    add(f"**Norma:** {r.norma}  ")
+    add("**Elemento:** Solda de filete solicitada ao cisalhamento (ELU)")
+    add("")
+
+    add("## 1. Dados de entrada")
+    add("")
+    add("| Parâmetro | Valor |")
+    add("|-----------|-------|")
+    add(f"| Força solicitante de cálculo | {r.forca_kn:.2f} kN |")
+    add(f"| Perna do filete | {r.perna_mm:g} mm |")
+    add(f"| Resistência do metal da solda fw | {r.fw_mpa:.0f} MPa |")
+    add(f"| Coeficiente de ponderação γa2 | {r.gamma_a2:.2f} |")
+    add("")
+
+    add("## 2. Resistência da solda (Rd = 0,6·fw·aw/γa2)")
+    add("")
+    add(f"- Garganta efetiva: aw = 0,7·perna = {r.aw_cm:.4f} cm")
+    add(f"- Resistência por unidade de comprimento: Rd = {r.rd_kn_cm:.4f} kN/cm")
+    add("")
+
+    add("## 3. Comprimento necessário de solda")
+    add("")
+    add(f"- **Comprimento de solda: L = força/Rd = {r.comprimento_nec_cm:.2f} cm**")
     add("")
 
     linhas += _validation_section(rep, 4)
