@@ -114,7 +114,8 @@ if divergence > 0.20:
 
 Este cálculo é uma ferramenta de suporte à decisão de engenharia.
 A responsabilidade técnica e legal é exclusiva do engenheiro responsável
-pelo projeto, conforme a Lei 5.194/66 e Resolução CONFEA/CREA vigente.
+pelo projeto, formalizada via ART (Anotação de Responsabilidade Técnica),
+conforme a Lei 6.496/77, a Lei 5.194/66 e a Resolução CONFEA/CREA vigente.
 
 Hipóteses adotadas: [listadas acima]
 Limitações: [listadas acima]

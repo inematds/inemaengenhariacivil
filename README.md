@@ -6,6 +6,14 @@ Plataforma profissional de agentes inteligentes para cálculos de engenharia civ
 
 **LLMs não fazem contas. Python faz contas. LLMs orquestram, interpretam e documentam.**
 
+## Escopo e Limites
+
+Esta plataforma é um **copiloto de apoio à engenharia, voltado a educação, pesquisa e
+verificação cruzada** — não um substituto do software de cálculo consagrado (TQS,
+Eberick/AltoQi, SAP2000, Robot) nem da responsabilidade técnica do engenheiro (ART).
+Todo resultado numérico vem de Python determinístico, é validado (unidades, física,
+norma) e acompanha aviso de responsabilidade técnica. Ver `docs/13-avaliacao-viabilidade.md`.
+
 ## Início Rápido
 
 ```bash
