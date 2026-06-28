@@ -1,0 +1,34 @@
+{
+  "id": "rede-hidraulica-v1",
+  "titulo": "Checklist: Rede de Abastecimento de Água",
+  "norma": "NBR 12218:2017 + NBR 5626:2020",
+  "itens": [
+    {
+      "grupo": "Dados de Entrada",
+      "checks": [
+        {"id": "DE01", "descricao": "População de projeto definida", "obrigatorio": true},
+        {"id": "DE02", "descricao": "Per capita de consumo definido", "obrigatorio": true},
+        {"id": "DE03", "descricao": "Coeficientes K1 e K2 definidos", "obrigatorio": true},
+        {"id": "DE04", "descricao": "Pressão mínima e máxima definidas", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Dimensionamento",
+      "checks": [
+        {"id": "DIM01", "descricao": "Vazão de projeto calculada (Q = per_capita x pop x K1 x K2)", "obrigatorio": true},
+        {"id": "DIM02", "descricao": "Diâmetros calculados (velocidade entre 0.6 e 3.0 m/s)", "obrigatorio": true},
+        {"id": "DIM03", "descricao": "Perda de carga calculada (Hazen-Williams ou Darcy)", "obrigatorio": true},
+        {"id": "DIM04", "descricao": "Pressão disponível em todos os nós verificada", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Verificações NBR 12218",
+      "checks": [
+        {"id": "V01", "descricao": "Pressão mínima >= 10 mca (estático)", "obrigatorio": true},
+        {"id": "V02", "descricao": "Pressão máxima <= 50 mca (dinâmico)", "obrigatorio": true},
+        {"id": "V03", "descricao": "Velocidade mínima >= 0.6 m/s (auto-limpante)", "obrigatorio": true},
+        {"id": "V04", "descricao": "Volume do reservatório >= 1/4 do consumo diário", "obrigatorio": true}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "id": "sapata-v1",
+  "titulo": "Checklist: Sapata Isolada",
+  "norma": "NBR 6118:2014 §22 + NBR 6122:2010",
+  "itens": [
+    {
+      "grupo": "Dados de Entrada",
+      "checks": [
+        {"id": "DE01", "descricao": "Carga normal de cálculo (Nd) definida", "obrigatorio": true},
+        {"id": "DE02", "descricao": "Momentos de cálculo (Msdx, Msdy) definidos", "obrigatorio": true},
+        {"id": "DE03", "descricao": "Tensão admissível do solo definida", "obrigatorio": true},
+        {"id": "DE04", "descricao": "fck do concreto especificado", "obrigatorio": true},
+        {"id": "DE05", "descricao": "Profundidade de fundação definida", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Dimensionamento",
+      "checks": [
+        {"id": "DIM01", "descricao": "Dimensões em planta (B x L) calculadas", "obrigatorio": true},
+        {"id": "DIM02", "descricao": "Tensão máxima no solo <= tensão admissível", "obrigatorio": true},
+        {"id": "DIM03", "descricao": "Altura da sapata (h) definida (h >= L/5)", "obrigatorio": true},
+        {"id": "DIM04", "descricao": "Armadura de flexão calculada nas duas direções", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Verificações NBR 6118",
+      "checks": [
+        {"id": "V01", "descricao": "Punção verificada (§18)", "obrigatorio": true},
+        {"id": "V02", "descricao": "Cisalhamento verificado", "obrigatorio": true},
+        {"id": "V03", "descricao": "Armadura mínima atendida", "obrigatorio": true},
+        {"id": "V04", "descricao": "Cobrimento mínimo atendido", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Verificações de Estabilidade",
+      "checks": [
+        {"id": "EST01", "descricao": "FS deslizamento >= 1.5", "obrigatorio": true},
+        {"id": "EST02", "descricao": "FS tombamento >= 2.0", "obrigatorio": true},
+        {"id": "EST03", "descricao": "Tensão mínima > 0 (sem arrancamento)", "obrigatorio": false}
+      ]
+    }
+  ]
+}

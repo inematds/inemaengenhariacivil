@@ -1,0 +1,32 @@
+# Preferências do usuário / escritório
+# Editado automaticamente pelos agentes conforme uso
+
+usuario:
+  nome: ""
+  crea: ""
+  especialidade: "Estruturas"
+
+escritorio:
+  nome: "INEMA Engenharia Civil"
+  cidade: ""
+  estado: ""
+
+preferencias_calculo:
+  concreto:
+    fck_padrao_mpa: 25
+    aco_padrao: "CA-50"
+    cobrimento_classe_agressividade: "CA-II"
+
+  fundacoes:
+    metodo_estacas_preferido: "aoki-velloso"
+    fator_seguranca_carga: 2.0
+
+  relatorios:
+    incluir_passos_intermediarios: true
+    idioma: "pt-BR"
+    norma_formato_data: "DD/MM/AAAA"
+
+metodos_preferidos:
+  perda_de_carga: "hazen-williams"
+  empuxo: "rankine"
+  capacidade_carga_sapata: "meyerhof"

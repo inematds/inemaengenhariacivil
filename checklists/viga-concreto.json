@@ -1,0 +1,40 @@
+{
+  "id": "viga-concreto-v1",
+  "titulo": "Checklist: Viga de Concreto Armado",
+  "norma": "NBR 6118:2014",
+  "itens": [
+    {
+      "grupo": "Dados de Entrada",
+      "checks": [
+        {"id": "DE01", "descricao": "fck definido e dentro dos limites (20-90 MPa)", "obrigatorio": true},
+        {"id": "DE02", "descricao": "Cargas com valores e unidades corretos", "obrigatorio": true},
+        {"id": "DE03", "descricao": "Vão de cálculo definido (luz teórica)", "obrigatorio": true},
+        {"id": "DE04", "descricao": "Seção transversal definida (b x h)", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Verificações ELU",
+      "checks": [
+        {"id": "ELU01", "descricao": "Flexão: As_calc >= As_min (Tab. 17.3)", "obrigatorio": true},
+        {"id": "ELU02", "descricao": "Cisalhamento verificado (§17.4)", "obrigatorio": true},
+        {"id": "ELU03", "descricao": "Domínio de deformação: 2 ou 3 (x/d <= 0.628)", "obrigatorio": true}
+      ]
+    },
+    {
+      "grupo": "Verificações ELS",
+      "checks": [
+        {"id": "ELS01", "descricao": "Flecha imediata calculada", "obrigatorio": false},
+        {"id": "ELS02", "descricao": "Flecha total <= L/250 (uso geral)", "obrigatorio": false},
+        {"id": "ELS03", "descricao": "Abertura de fissuras <= 0.3mm (CA-II)", "obrigatorio": false}
+      ]
+    },
+    {
+      "grupo": "Detalhamento",
+      "checks": [
+        {"id": "DET01", "descricao": "Cobrimento nominal conforme Tab. 7.2", "obrigatorio": true},
+        {"id": "DET02", "descricao": "Espaçamento mínimo entre barras verificado", "obrigatorio": true},
+        {"id": "DET03", "descricao": "Comprimento de ancoragem calculado", "obrigatorio": false}
+      ]
+    }
+  ]
+}
